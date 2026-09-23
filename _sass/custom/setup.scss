@@ -1,5 +1,12 @@
 // ============================================================
-// 主题变量覆盖（在配色方案之前导入，是官方指定的覆盖点）
+// 主题变量覆盖
+//
+// ⚠️ 这里**不能**写 !default。
+//    导入顺序是：support/support（主题变量定义） → custom/setup（本文件） → 配色方案 → modules
+//    support 里所有变量都带 !default，即「未定义时才赋值」；
+//    本文件在它之后执行，若我们也写 !default，就成了「已定义则不覆盖」——
+//    结果是这里的值被静默忽略（-width / -height / -font-family 都中过招）。
+//    直接赋值即可：配色方案在更后面，它们的 !default 同样不会再覆盖我们。
 // ------------------------------------------------------------
 // 这里只放「变量」，不放具体样式。具体样式全部写在 custom.scss。
 //
@@ -37,36 +44,36 @@ $wb-font-sans: "Source Han Sans SC", "Noto Sans SC", "HarmonyOS Sans SC", "PingF
 // 数字用衬线体：编号 01–06 用上它能立刻拉开层次。
 $wb-font-num: "Palatino Linotype", "Book Antiqua", Palladio, "URW Palladio L", Georgia, serif;
 
-$body-font-family: $wb-font-sans !default;
+$body-font-family: $wb-font-sans;
 
 // ---------- 主题颜色变量 ----------
-$body-background-color: $wb-paper-100 !default;
-$body-heading-color: $wb-text-head !default;
-$body-text-color: $wb-text-dark !default;
-$link-color: #1c6a63 !default; // 深青，和金色点缀区分开
-$nav-child-link-color: $wb-text-muted !default;
+$body-background-color: $wb-paper-100;
+$body-heading-color: $wb-text-head;
+$body-text-color: $wb-text-dark;
+$link-color: #1c6a63; // 深青，和金色点缀区分开
+$nav-child-link-color: $wb-text-muted;
 
-$sidebar-color: $wb-ink-900 !default;
+$sidebar-color: $wb-ink-900;
 // 深色侧栏上的「悬停反馈」要变亮，所以不能用 darken()，直接给更亮的一层
-$feedback-color: $wb-ink-800 !default;
+$feedback-color: $wb-ink-800;
 
-$base-button-color: $wb-paper-300 !default;
-$btn-primary-color: #a8761f !default;
+$base-button-color: $wb-paper-300;
+$btn-primary-color: #a8761f;
 
-$code-background-color: $wb-paper-200 !default;
-$table-background-color: #fffdf8 !default;
-$search-background-color: $wb-ink-800 !default;
-$search-result-preview-color: $wb-text-muted !default;
+$code-background-color: $wb-paper-200;
+$table-background-color: #fffdf8;
+$search-background-color: $wb-ink-800;
+$search-result-preview-color: $wb-text-muted;
 
 // 主题自带的版面尺度
 // 顶栏放两行（主标题 + 小字说明），所以比默认略高一点；
 // 侧栏品牌条用的是同一个变量，两边高度对齐，深色框架的顶边才是一条直线。
-$header-height: 4rem !default;
+$header-height: 4rem;
 
 // 侧边栏宽度：主题默认 16.5rem，且在 lg 断点还会用公式吃掉视口的余量
 // （1456px 视口下能撑到约 460px）。这里收窄成固定窄栏。
 // 11rem = 176px，放得下「五毒沼泽入口」这种 6 字条目 + 图标。
-$nav-width: 11rem !default;
-$nav-width-md: 10rem !default;
+$nav-width: 11rem;
+$nav-width-md: 10rem;
 
 // $content-width: 50rem;
