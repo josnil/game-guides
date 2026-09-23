@@ -1,0 +1,62 @@
+{%- comment -%}
+覆盖主题默认的 components/site_nav.html —— 侧边栏的目录本体。
+
+⚠️ 根节点必须保持 <nav id="site-nav" class="site-nav">：
+   主题的样式与移动端抽屉开合脚本都依赖这个 id / class。
+
+内容替换为两个模块，数据来自 _data/：
+  - 阶段攻略   ← _data/stages.yml
+  - 宠物培养建议 ← _data/pets.yml
+{%- endcomment -%}
+<nav aria-label="攻略目录" id="site-nav" class="site-nav">
+
+  <section class="wb-mod">
+    <h2 class="wb-mod__title">
+      <span class="wb-mod__zh">阶段攻略</span>
+      <span class="wb-mod__en">Stages</span>
+    </h2>
+
+    <ul class="wb-mod__list">
+      {%- for stage in site.data.stages -%}
+        {%- assign stage_url = '/stages/' | append: stage.slug | append: '/' -%}
+        {%- assign is_here = false -%}
+        {%- if page.url == stage_url -%}{%- assign is_here = true -%}{%- endif -%}
+        <li class="wb-item{% if is_here %} is-here{% endif %}">
+          <a class="wb-item__link" href="{{ stage_url | relative_url }}">
+            <span class="wb-item__num" aria-hidden="true">{{ stage.index }}</span>
+            <span class="wb-item__body">
+              <span class="wb-item__name">{{ stage.name }}</span>
+            </span>
+          </a>
+        </li>
+      {%- endfor -%}
+    </ul>
+  </section>
+
+  <section class="wb-mod">
+    <h2 class="wb-mod__title">
+      <span class="wb-mod__zh">宠物培养建议</span>
+      <span class="wb-mod__en">Companions</span>
+    </h2>
+
+    {%- assign pets = site.data.pets.items -%}
+    {%- if pets and pets.size > 0 -%}
+      <ul class="wb-mod__list">
+        {%- for item in pets -%}
+          {%- assign is_here = false -%}
+          {%- if page.url == item.url -%}{%- assign is_here = true -%}{%- endif -%}
+          <li class="wb-item{% if is_here %} is-here{% endif %}">
+            <a class="wb-item__link" href="{{ item.url | relative_url }}">
+              <span class="wb-item__body">
+                <span class="wb-item__name">{{ item.title }}</span>
+              </span>
+            </a>
+          </li>
+        {%- endfor -%}
+      </ul>
+    {%- else -%}
+      <p class="wb-mod__empty">条目待补充</p>
+    {%- endif -%}
+  </section>
+
+</nav>

@@ -332,10 +332,16 @@ for (const { file, parent } of pendingParents) {
 // ============================================================
 const knownUrls = new Set();
 
-// 6.1 根目录的页面（index.md / outdated.md / versions.md …）
+// 6.1 所有页面（_guides 是 collection，单独在 6.2 处理）
+//     不能只看根目录：stages/xxx.md 这类子目录页面也要纳入，
+//     否则侧边栏指向它们的链接会被误报成死链。
 for (const p of walk(ROOT)) {
-  if (path.dirname(p) !== ROOT) continue;
-  if (!p.endsWith(".md") || p.endsWith("README.md")) continue;
+  if (!p.endsWith(".md")) continue;
+  if (path.basename(p) === "README.md") continue;
+  if (p.includes(`${path.sep}node_modules${path.sep}`)) continue;
+  if (p.startsWith(GUIDES_DIR + path.sep)) continue; // collection 交给 6.2
+  if (rel(p).startsWith("tools/")) continue; // 不参与构建
+
   const f = rel(p);
   const fm = splitFrontMatter(read(p));
   let data = {};
@@ -346,14 +352,26 @@ for (const p of walk(ROOT)) {
       data = {};
     }
   }
+
   const base = path.basename(p, ".md");
+  // 注意：path.relative 对「同一目录」返回的是空字符串，不是 "."。
+  // 早期版本拿 "." 判断根目录，结果 index.md 没被算成 "/"，首页链接被误报成死链。
+  const dirRaw = path.relative(ROOT, path.dirname(p));
+  const dirRel = dirRaw === "" ? "" : dirRaw.split(path.sep).join("/");
+  const isRoot = dirRel === "";
+
   if (data.permalink) {
     knownUrls.add(String(data.permalink));
   } else if (base === "index") {
-    knownUrls.add("/");
+    knownUrls.add(isRoot ? "/" : `/${dirRel}/`);
   } else {
-    knownUrls.add(`/${base}.html`);
-    W(f, `没有写 permalink，这一页的网址会是 /${base}.html（带 .html 后缀）。如果正文里其他地方用 /${base}/ 链接它就会 404 —— 建议加 permalink: /${base}/`);
+    const guess = isRoot ? `/${base}.html` : `/${dirRel}/${base}.html`;
+    const pretty = isRoot ? `/${base}/` : `/${dirRel}/${base}/`;
+    knownUrls.add(guess);
+    W(
+      f,
+      `没有写 permalink，这一页的网址会是 ${guess}（带 .html 后缀）。若别处用 ${pretty} 链接它就会 404 —— 建议补一行 permalink: ${pretty}`
+    );
   }
 }
 
@@ -404,6 +422,58 @@ for (const p of linkSources) {
       E(f, `链接目标 ${target} 在站点里不存在 —— 生成后会是 404 ${hint}`);
     }
   }
+}
+
+// 6.4 数据驱动的导航
+// ------------------------------------------------------------
+// 顶部导航与侧边栏的地址来自 _data/*.yml，模板里写的是
+// {{ item.url | relative_url }}（变量而非字面量），6.3 抓不到。
+// 所以这里直接读数据文件，逐个核对目标页面是否存在。
+// 这正是「改了 permalink 或改了 slug，却忘了同步菜单」这类错误的拦截点。
+// ------------------------------------------------------------
+function loadData(name) {
+  const p = path.join(ROOT, "_data", name);
+  if (!fs.existsSync(p)) return null;
+  if (!yaml) return null;
+  try {
+    return yaml.load(read(p));
+  } catch (e) {
+    E(`_data/${name}`, `YAML 解析失败：${e.message}`);
+    return null;
+  }
+}
+
+function checkNavTarget(label, url) {
+  if (!url) return;
+  if (knownUrls.has(url)) return;
+  const alt = String(url).replace(/\/$/, ".html");
+  const hint = knownUrls.has(alt)
+    ? `（写成 ${alt} 才是对的）`
+    : "（站点里没有这个地址：页面不存在，或者少了 permalink）";
+  E(label, `导航指向 ${url}，但目标不存在 ${hint}`);
+}
+
+const navItems = loadData("site_nav.yml");
+if (Array.isArray(navItems)) {
+  if (navItems.length === 0) W("_data/site_nav.yml", "顶部导航是空的");
+  for (const item of navItems) checkNavTarget("_data/site_nav.yml", item.url);
+}
+
+const stageItems = loadData("stages.yml");
+if (Array.isArray(stageItems)) {
+  if (stageItems.length === 0) W("_data/stages.yml", "阶段攻略没有任何条目");
+  for (const s of stageItems) {
+    if (!s.slug) {
+      E("_data/stages.yml", `条目「${s.name || "?"}」缺少 slug`);
+      continue;
+    }
+    checkNavTarget("_data/stages.yml", `/stages/${s.slug}/`);
+  }
+}
+
+const pets = loadData("pets.yml");
+if (pets && Array.isArray(pets.items)) {
+  for (const it of pets.items) checkNavTarget("_data/pets.yml", it.url);
 }
 
 // ============================================================
@@ -464,10 +534,14 @@ if (errors.length) {
   for (const e of errors) console.log(`  x ${e.file} —— ${e.msg}`);
   console.log("");
   console.log("预检未通过。修掉上面这些再推送到 GitHub。");
-  process.exit(1);
+  // 注意：这里不能用 process.exit(1)。
+  // Node 在 stdout 不是终端（被管道、子进程、CI 捕获）时，
+  // process.exit() 会截断尚未刷出的输出 —— 调用方只能收到空输出和一个非零码，
+  // 完全看不到错在哪。用 exitCode 让进程自然退出，输出才会被完整写出。
+  process.exitCode = 1;
+} else {
+  console.log(`OK: ${guideCount} 篇攻略全部通过`);
+  console.log("");
+  console.log("提醒：这只是近似校验。最终以 GitHub Actions 的构建结果为准。");
+  process.exitCode = 0;
 }
-
-console.log(`OK: ${guideCount} 篇攻略全部通过`);
-console.log("");
-console.log("提醒：这只是近似校验。最终以 GitHub Actions 的构建结果为准。");
-process.exit(0);

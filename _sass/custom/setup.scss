@@ -1,0 +1,67 @@
+// ============================================================
+// 主题变量覆盖（在配色方案之前导入，是官方指定的覆盖点）
+// ------------------------------------------------------------
+// 这里只放「变量」，不放具体样式。具体样式全部写在 custom.scss。
+//
+// 配色思路：深色「框架」+ 暖调「纸面」内容区
+//   - 侧边栏与顶栏用同一套深墨色，视觉上连成一圈「画框」
+//   - 内容区用暖白纸色（不是纯白），长时间阅读不刺眼
+//   - 金色只做点缀（约 10%），用于悬停、强调与编号
+// ============================================================
+
+// ---------- 调色板 ----------
+$wb-ink-950: #0b1219; // 顶栏（最深）
+$wb-ink-900: #101a24; // 侧边栏
+$wb-ink-800: #1a2632; // 深色上的悬停面
+$wb-ink-700: #26374a; // 深色上的描边
+$wb-gold-500: #d4a04a; // 主点缀色
+$wb-gold-400: #e2b667;
+$wb-gold-200: #f2dcae;
+$wb-paper-100: #f7f4ed; // 内容区底色（暖白，非纯白）
+$wb-paper-200: #efe9dd;
+$wb-paper-300: #e2dacb;
+$wb-text-dark: #2b2722; // 纸面上的正文
+$wb-text-head: #1f1b16; // 纸面上的标题
+$wb-text-muted: #6b6156; // 纸面上的次要文字
+$wb-on-ink: #f2ece0; // 深色上的主文字
+$wb-on-ink-dim: #b9b1a3; // 深色上的次要文字
+
+// ---------- 字体 ----------
+// 展示体用楷体：中文网站极少用它，天然带「古籍/手抄攻略」气质，
+// 且 Windows / macOS 都自带，不产生任何网络请求。
+$wb-font-display: "KaiTi", "STKaiti", "Kaiti SC", "Songti SC", "Source Han Serif SC",
+  "Noto Serif SC", serif;
+// 正文黑体栈：优先思源/苹方等观感更好的现代黑体，最后回落到系统默认。
+$wb-font-sans: "Source Han Sans SC", "Noto Sans SC", "HarmonyOS Sans SC", "PingFang SC",
+  "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif;
+// 数字用衬线体：编号 01–06 用上它能立刻拉开层次。
+$wb-font-num: "Palatino Linotype", "Book Antiqua", Palladio, "URW Palladio L", Georgia, serif;
+
+$body-font-family: $wb-font-sans !default;
+
+// ---------- 主题颜色变量 ----------
+$body-background-color: $wb-paper-100 !default;
+$body-heading-color: $wb-text-head !default;
+$body-text-color: $wb-text-dark !default;
+$link-color: #1c6a63 !default; // 深青，和金色点缀区分开
+$nav-child-link-color: $wb-text-muted !default;
+
+$sidebar-color: $wb-ink-900 !default;
+// 深色侧栏上的「悬停反馈」要变亮，所以不能用 darken()，直接给更亮的一层
+$feedback-color: $wb-ink-800 !default;
+
+$base-button-color: $wb-paper-300 !default;
+$btn-primary-color: #a8761f !default;
+
+$code-background-color: $wb-paper-200 !default;
+$table-background-color: #fffdf8 !default;
+$search-background-color: $wb-ink-800 !default;
+$search-result-preview-color: $wb-text-muted !default;
+
+// 主题自带的版面尺度
+// 顶栏放两行（主标题 + 小字说明），所以比默认略高一点；
+// 侧栏品牌条用的是同一个变量，两边高度对齐，深色框架的顶边才是一条直线。
+$header-height: 4rem !default;
+
+// $nav-width: 16.5rem;
+// $content-width: 50rem;

@@ -1,17 +1,588 @@
+// ============================================================
+// 自定义样式（主题在最后导入本文件，所以这里能覆盖一切）
 // ------------------------------------------------------------
-// 自定义样式。
-// just-the-docs 的主题样式会在末尾引入本文件，所以主题升级时
-// 这里的内容不会被覆盖 —— 所有自定义样式都请写在本文件里。
-// 注意：本主题使用的 Sass 编译器版本较旧，不要用 @use 语法，
-// 直接写 CSS 即可（下面的 & 嵌套会被正常编译）。
-// ------------------------------------------------------------
+// 组织方式：
+//   0. 设计令牌
+//   1. 深色框架（侧边栏 / 顶栏 的底子）
+//   2. 顶部导航与悬停动效
+//   3. 侧边栏模块与悬停动效
+//   4. 搜索框（适配深色）
+//   5. 内容区
+//   6. 工具类与降级
+//   7. 沿用原有组件
+// 注意：主题用的 Sass 编译器较旧，不要用 @use，只用 & 嵌套。
+// ============================================================
 
+// ---------- 0. 设计令牌 ----------
+:root {
+  --wb-ink-950: #{$wb-ink-950};
+  --wb-ink-900: #{$wb-ink-900};
+  --wb-ink-800: #{$wb-ink-800};
+  --wb-ink-700: #{$wb-ink-700};
+  --wb-gold-500: #{$wb-gold-500};
+  --wb-gold-400: #{$wb-gold-400};
+  --wb-gold-200: #{$wb-gold-200};
+  --wb-paper-100: #{$wb-paper-100};
+  --wb-paper-200: #{$wb-paper-200};
+  --wb-paper-300: #{$wb-paper-300};
+  --wb-on-ink: #{$wb-on-ink};
+  --wb-on-ink-dim: #{$wb-on-ink-dim};
+  --wb-on-ink-faint: #7d8b99;
+  --wb-text-dark: #{$wb-text-dark};
+  --wb-text-head: #{$wb-text-head};
+  --wb-text-muted: #{$wb-text-muted};
+
+  --wb-font-display: #{$wb-font-display};
+  --wb-font-num: #{$wb-font-num};
+
+  // 统一缓动：起步快、收尾稳，比 ease 更有「手法感」
+  --wb-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  // 极轻噪点纹理，给深色面板加质感（纯 CSS，无外部请求）
+  --wb-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.086'/%3E%3C/svg%3E");
+}
+
+// ---------- 1. 深色框架 ----------
+// 侧边栏与顶栏共用同一套深墨色 + 同一种金色辉光，
+// 视觉上连成环形「画框」，把内容区托起来。
+.side-bar {
+  background-color: var(--wb-ink-900);
+  background-image:
+    radial-gradient(130% 70% at 100% 0%, rgba(212, 160, 74, 0.11), transparent 62%),
+    var(--wb-noise);
+  border-right: 1px solid var(--wb-ink-700);
+}
+
+.main-header {
+  background-color: var(--wb-ink-950);
+  background-image:
+    radial-gradient(90% 260% at 0% 50%, rgba(212, 160, 74, 0.08), transparent 55%),
+    var(--wb-noise);
+  border-bottom: 1px solid var(--wb-ink-700);
+}
+
+// 侧栏品牌名在深色上要提亮（主题默认用的是深色标题色）
+.site-title {
+  color: var(--wb-on-ink);
+  font-family: var(--wb-font-display);
+  letter-spacing: 0.06em;
+
+  &:hover {
+    color: var(--wb-gold-200);
+    background-image: linear-gradient(
+      -90deg,
+      rgba(212, 160, 74, 0.22) 0%,
+      rgba(212, 160, 74, 0.1) 80%,
+      transparent 100%
+    );
+  }
+}
+
+.icon {
+  color: var(--wb-on-ink-dim);
+}
+
+.site-footer {
+  color: var(--wb-on-ink-faint);
+}
+
+.wb-side__foot {
+  display: inline-block;
+  color: var(--wb-on-ink-faint);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+}
+
+// ---------- 2. 顶部导航 ----------
+.wb-nav--bar {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wb-nav__list {
+  display: flex;
+  align-items: stretch;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-nav__link {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 44px; // 触摸目标下限
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  color: var(--wb-on-ink-dim);
+  text-decoration: none;
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.22s var(--wb-ease);
+
+  // 金色下划线：自左向右展开
+  &::after {
+    content: "";
+    position: absolute;
+    right: 0.9rem;
+    bottom: 0.34rem;
+    left: 0.9rem;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--wb-gold-500), var(--wb-gold-200) 55%, transparent);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.28s var(--wb-ease);
+  }
+
+  &:hover,
+  &:focus-visible {
+    color: var(--wb-on-ink);
+    background-color: var(--wb-ink-800);
+    transform: translateY(-1px);
+
+    &::after {
+      transform: scaleX(1);
+    }
+
+    .wb-nav__txt {
+      letter-spacing: 0.09em;
+    }
+
+    .wb-nav__desc {
+      color: var(--wb-gold-400);
+    }
+  }
+}
+
+.wb-nav__txt {
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: letter-spacing 0.24s var(--wb-ease);
+}
+
+.wb-nav__desc {
+  color: var(--wb-on-ink-faint);
+  font-size: 0.68rem;
+  white-space: nowrap;
+  transition: color 0.18s ease;
+}
+
+.wb-nav__item.is-here .wb-nav__link {
+  color: var(--wb-on-ink);
+
+  &::after {
+    transform: scaleX(1);
+  }
+
+  .wb-nav__desc {
+    color: var(--wb-gold-400);
+  }
+}
+
+.wb-search {
+  display: flex;
+  flex: 0 1 20rem;
+  align-items: center;
+  min-width: 0;
+  padding-right: 0.75rem;
+}
+
+// ---------- 3. 侧边栏模块 ----------
+.wb-mod {
+  padding: 0 0.5rem 0.25rem;
+}
+
+.wb-mod__title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 1.5rem 0 0.45rem;
+  padding: 0 0.6rem;
+  color: var(--wb-on-ink);
+  font-family: var(--wb-font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  line-height: 1.3;
+}
+
+.wb-mod__en {
+  color: rgba(212, 160, 74, 0.55);
+  font-family: var(--wb-font-num);
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.wb-mod__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-mod__empty {
+  margin: 0 0.6rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px dashed var(--wb-ink-700);
+  border-radius: 8px;
+  color: var(--wb-on-ink-faint);
+  font-size: 0.78rem;
+}
+
+.wb-item__link {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 48px;
+  padding: 0.45rem 0.7rem 0.45rem 0.55rem;
+  border-radius: 0 10px 10px 0;
+  overflow: hidden;
+  color: var(--wb-on-ink-dim);
+  text-decoration: none;
+  transition: color 0.18s ease;
+
+  // 背景扫光：由左向右铺开
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: linear-gradient(
+      90deg,
+      rgba(212, 160, 74, 0.17) 0%,
+      rgba(212, 160, 74, 0.05) 62%,
+      transparent 100%
+    );
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.32s var(--wb-ease);
+  }
+
+  // 左侧金色竖条
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    z-index: 1;
+    width: 3px;
+    height: 62%;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(180deg, var(--wb-gold-200), var(--wb-gold-500));
+    transform: translateY(-50%) scaleY(0);
+    transform-origin: center;
+    transition: transform 0.26s var(--wb-ease);
+  }
+
+  &:hover,
+  &:focus-visible {
+    color: var(--wb-on-ink);
+
+    &::before {
+      transform: scaleX(1);
+    }
+
+    &::after {
+      transform: translateY(-50%) scaleY(1);
+    }
+
+    .wb-item__num {
+      color: var(--wb-gold-400);
+      transform: scale(1.08);
+    }
+
+    .wb-item__body {
+      transform: translateX(3px);
+    }
+  }
+}
+
+.wb-item__num,
+.wb-item__body {
+  position: relative;
+  z-index: 1;
+}
+
+.wb-item__num {
+  color: rgba(242, 236, 224, 0.26);
+  font-family: var(--wb-font-num);
+  font-size: 1.3rem;
+  line-height: 1;
+  text-align: center;
+  transition:
+    color 0.2s ease,
+    transform 0.26s var(--wb-ease);
+}
+
+.wb-item__body {
+  display: block;
+  min-width: 0;
+  transition: transform 0.24s var(--wb-ease);
+}
+
+.wb-item__name {
+  display: block;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.wb-item.is-here .wb-item__link {
+  color: var(--wb-on-ink);
+
+  &::before {
+    transform: scaleX(1);
+  }
+
+  &::after {
+    transform: translateY(-50%) scaleY(1);
+  }
+
+  .wb-item__num {
+    color: var(--wb-gold-400);
+  }
+}
+
+// 抽屉里的导航：纵向排列，与模块条目同一套观感
+.wb-nav--drawer {
+  padding: 0 0.5rem;
+
+  .wb-nav__list {
+    display: block;
+  }
+
+  .wb-nav__link {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.6rem 0.7rem;
+    border-radius: 10px;
+
+    &::after {
+      top: 50%;
+      right: auto;
+      bottom: auto;
+      left: 0.2rem;
+      width: 3px;
+      height: 62%;
+      background: linear-gradient(180deg, var(--wb-gold-200), var(--wb-gold-500));
+      transform: translateY(-50%) scaleY(0);
+      transform-origin: center;
+    }
+
+    &:hover,
+    &:focus-visible {
+      transform: none;
+
+      &::after {
+        transform: translateY(-50%) scaleY(1);
+      }
+    }
+  }
+
+  .wb-nav__item.is-here .wb-nav__link::after {
+    transform: translateY(-50%) scaleY(1);
+  }
+}
+
+// ---------- 4. 搜索框（适配深色） ----------
+.search {
+  width: 100%;
+}
+
+.search-input {
+  color: var(--wb-on-ink);
+  background-color: var(--wb-ink-800);
+  border: 1px solid var(--wb-ink-700);
+
+  &::placeholder {
+    color: var(--wb-on-ink-faint);
+  }
+
+  &:focus {
+    border-color: var(--wb-gold-500);
+  }
+}
+
+.search-label .search-icon {
+  color: var(--wb-on-ink-dim);
+}
+
+.search-results {
+  background-color: var(--wb-ink-800);
+  border-color: var(--wb-ink-700);
+}
+
+.search-results-list-item:hover {
+  background-color: var(--wb-ink-700);
+}
+
+.search-result-title,
+.search-result-doc-title {
+  color: var(--wb-on-ink);
+}
+
+.search-result-preview {
+  color: var(--wb-on-ink-dim);
+}
+
+// ---------- 5. 内容区 ----------
+// 暖白纸面 + 极轻的纵向渐变，避免大面积死白
+.main-content-wrap {
+  background-color: var(--wb-paper-100);
+  background-image: linear-gradient(180deg, rgba(226, 218, 203, 0.35), transparent 22rem);
+}
+
+// 标题用楷体：中文站点极少这么用，能立刻拉开气质差异
+.main-content h1,
+.main-content h2 {
+  font-family: var(--wb-font-display);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.main-content h1 {
+  font-size: 2.35rem;
+  line-height: 1.25;
+
+  &::after {
+    content: "";
+    display: block;
+    width: 3.5rem;
+    height: 3px;
+    margin-top: 0.7rem;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--wb-gold-500), rgba(212, 160, 74, 0));
+  }
+}
+
+.main-content h2 {
+  font-size: 1.6rem;
+}
+
+// 「待填充」占位块：让空页面看起来是「有意留白」，而不是做坏了
+.wb-todo {
+  position: relative;
+  margin: 1.6rem 0;
+  padding: 1.5rem 1.5rem 1.4rem;
+  border: 1px dashed var(--wb-paper-300);
+  border-radius: 14px;
+  background-color: rgba(255, 253, 248, 0.7);
+  overflow: hidden;
+
+  // 右上角的浅金角标
+  &::after {
+    content: "";
+    position: absolute;
+    top: -3.5rem;
+    right: -3.5rem;
+    width: 8rem;
+    height: 8rem;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(212, 160, 74, 0.16), transparent 70%);
+  }
+}
+
+.wb-todo__mark {
+  display: inline-block;
+  margin: 0 0 0.7rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid rgba(212, 160, 74, 0.45);
+  border-radius: 999px;
+  color: #8a6218;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+}
+
+.wb-todo__title {
+  margin: 0 0 0.4rem;
+  color: var(--wb-text-head);
+  font-family: var(--wb-font-display);
+  font-size: 1.15rem;
+}
+
+.wb-todo__hint {
+  margin: 0;
+  color: var(--wb-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+// 正文行高放宽，长文更好读
+.main-content p,
+.main-content li {
+  line-height: 1.78;
+}
+
+// ---------- 6. 工具类与降级 ----------
+.wb-only-mobile {
+  display: block;
+}
+
+@include mq(md) {
+  .wb-only-mobile {
+    display: none !important;
+  }
+}
+
+// 键盘可达性：所有可点元素都要有清晰焦点环
+.wb-nav__link:focus-visible,
+.wb-item__link:focus-visible,
+.site-title:focus-visible,
+.site-button:focus-visible {
+  outline: 2px solid var(--wb-gold-400);
+  outline-offset: 2px;
+}
+
+// 尊重系统的「减少动态效果」
+@media (prefers-reduced-motion: reduce) {
+  .wb-nav__link,
+  .wb-nav__link::after,
+  .wb-nav__txt,
+  .wb-nav__desc,
+  .wb-item__link,
+  .wb-item__link::before,
+  .wb-item__link::after,
+  .wb-item__num,
+  .wb-item__body {
+    transition-duration: 0.01ms !important;
+  }
+
+  .wb-nav__link:hover,
+  .wb-item__link:hover {
+    transform: none !important;
+  }
+}
+
+// 深色侧栏的滚动条调暗，避免一条亮白闪出来
+.side-bar {
+  scrollbar-color: var(--wb-ink-700) transparent;
+}
+
+.site-nav::-webkit-scrollbar {
+  width: 8px;
+}
+
+.site-nav::-webkit-scrollbar-thumb {
+  background-color: var(--wb-ink-700);
+  border-radius: 4px;
+}
+
+// ---------- 7. 沿用原有组件（徽章 / 元信息条），配色并入新调色板 ----------
 .vg-badge {
   display: inline-block;
-  margin: 0 0 1rem 0;
+  margin: 0 0 1rem;
   padding: 0.3rem 0.7rem;
-  border-radius: 999px;
   border: 1px solid;
+  border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.4;
@@ -33,29 +604,29 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin: 0 0 1.5rem 0;
+  margin: 0 0 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid #e6e6e6;
+  border-bottom: 1px solid var(--wb-paper-300);
 }
 
 .vg-chip {
   display: inline-block;
   padding: 0.2rem 0.6rem;
+  border: 1px solid var(--wb-paper-300);
   border-radius: 999px;
-  border: 1px solid #e0e0e0;
-  background-color: #f2f2f2;
-  color: #3c3c3c;
+  background-color: var(--wb-paper-200);
+  color: var(--wb-text-muted);
   font-size: 0.72rem;
   line-height: 1.5;
 
   &--tag {
-    color: #2a5db0;
-    background-color: #eef3fd;
-    border-color: #c7d8f5;
+    color: #1c6a63;
+    background-color: #e7f2f0;
+    border-color: #b7dbd6;
   }
 
   &--muted {
-    color: #6b6b6b;
+    color: var(--wb-text-muted);
     background-color: transparent;
     border-color: transparent;
   }

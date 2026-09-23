@@ -83,19 +83,23 @@ if (changed.length > 20) console.log(C.dim(`    ...另外 ${changed.length - 20}
 
 // --- 1. 预检 -----------------------------------------------------
 step(1, "本地预检（tools/precheck.mjs）");
-let precheckOk = true;
-try {
-  const out = execFileSync(process.execPath, ["tools/precheck.mjs"], {
-    cwd: ROOT,
-    encoding: "utf8",
-  });
-  console.log(out.trimEnd());
-} catch (e) {
-  precheckOk = false;
-  console.log(((e.stdout || "") + "").trimEnd());
-  console.log(C.err((e.stderr || "").trimEnd()));
-}
-if (!precheckOk) {
+
+// 直接在同一个进程里运行预检，不另起子进程。
+//
+// 为什么不用 execFileSync 起子进程：在受限环境下 node 再 spawn node 会报 EBUSY
+// （子进程根本没被创建），此时 stdout 是空的、退出码非 0，
+// 与「预检真的发现了错误」在表象上几乎一样 —— 会把本来能发布的改动误判成失败。
+// 改成同进程运行后，既没有这个歧义，也更快。
+//
+// precheck.mjs 的契约是：打印报告 + 用 process.exitCode 表达成败。
+// 所以这里先把它临时归零，跑完再读回来，然后把 exitCode 还原成发布流程自己的。
+const keepExitCode = process.exitCode;
+process.exitCode = 0;
+await import("./precheck.mjs");
+const precheckCode = process.exitCode;
+process.exitCode = keepExitCode || 0;
+
+if (precheckCode !== 0) {
   die("预检未通过。修掉上面的错误再发布（这才是它的意义）。");
 }
 console.log(C.ok("  预检通过"));

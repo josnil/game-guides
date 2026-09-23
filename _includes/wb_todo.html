@@ -1,0 +1,11 @@
+{%- comment -%}
+统一的「待填充」占位块。用在本轮只搭结构、内容后补的页面上。
+参数：hint（可选）——补充一句说明。
+{%- endcomment -%}
+<div class="wb-todo">
+  <p class="wb-todo__mark" aria-hidden="true">待填充</p>
+  <p class="wb-todo__title">本页结构已就位，内容待补充</p>
+  <p class="wb-todo__hint">
+    {{ include.hint | default: "把内容写在本文件 front matter 下面的正文里即可，布局会自动套用。" }}
+  </p>
+</div>

@@ -1,0 +1,29 @@
+{%- comment -%}
+顶部导航清单 —— 被两处复用：
+  1. _includes/components/header.html        桌面端：顶栏里横向排布
+  2. _includes/components/sidebar.html       移动端：抽屉里纵向排布
+
+参数：variant = "bar"（默认）| "drawer"
+数据：_data/site_nav.yml
+{%- endcomment -%}
+{%- assign variant = include.variant | default: "bar" -%}
+<nav class="wb-nav wb-nav--{{ variant }}" aria-label="主导航">
+  <ul class="wb-nav__list">
+    {%- for item in site.data.site_nav -%}
+      {%- assign is_here = false -%}
+      {%- if page.url == item.url -%}
+        {%- assign is_here = true -%}
+      {%- elsif item.url != "/" and page.url contains item.url -%}
+        {%- assign is_here = true -%}
+      {%- endif -%}
+      <li class="wb-nav__item{% if is_here %} is-here{% endif %}">
+        <a class="wb-nav__link" href="{{ item.url | relative_url }}">
+          <span class="wb-nav__txt">{{ item.title }}</span>
+          {%- if item.desc and item.desc != "" -%}
+            <span class="wb-nav__desc">{{ item.desc }}</span>
+          {%- endif -%}
+        </a>
+      </li>
+    {%- endfor -%}
+  </ul>
+</nav>

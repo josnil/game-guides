@@ -1,0 +1,37 @@
+{%- comment -%}
+覆盖主题默认的 components/sidebar.html。
+
+⚠️ 结构必须与主题一致，否则移动端抽屉开合与侧栏滚动都会失效。保留的契约：
+   .side-bar / .site-header / .site-title / #menu-button / nav#site-nav.site-nav
+   并且 .site-nav 必须是 .side-bar 的「直接子元素」——
+   主题靠 .side-bar{flex-flow:column} + .site-nav{flex:1 1 auto;overflow-y:auto} 实现侧栏滚动，
+   中间多套一层容器会让它失去伸缩与滚动能力。
+   脚本契约：点 #menu-button 会给 #menu-button 切 aria-expanded，
+   并给 .site-nav 与 .main-header 切 .nav-open。
+
+改动点：
+   - nav 本体换成两个模块（定义在 components/site_nav.html）
+   - 抽屉里额外放一份顶部导航（桌面端的 .main-header 在窄屏是 display:none）
+{%- endcomment -%}
+<header class="side-bar">
+  <div class="site-header">
+    <a href="{{ '/' | relative_url }}" class="site-title lh-tight">{% include title.html %}</a>
+    <button id="menu-button" class="site-button btn-reset" aria-label="菜单" aria-expanded="false">
+      <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><use xlink:href="#svg-menu"></use></svg>
+    </button>
+  </div>
+
+  {%- comment -%} 移动端专用：顶栏在 md 以下不显示，导航放进抽屉 {%- endcomment -%}
+  <div class="wb-only-mobile">
+    {%- include wb_topnav.html variant="drawer" -%}
+  </div>
+
+  {%- include components/site_nav.html -%}
+
+  <div class="d-md-block d-none site-footer">
+    {% capture nav_footer_custom %}{%- include nav_footer_custom.html -%}{% endcapture %}
+    {% if nav_footer_custom != "" %}{{ nav_footer_custom }}{% else %}
+      <span class="wb-side__foot">内容持续补充中</span>
+    {% endif %}
+  </div>
+</header>

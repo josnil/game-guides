@@ -1,0 +1,19 @@
+{%- comment -%}
+覆盖主题默认的 components/header.html —— 顶栏。
+
+⚠️ 必须保留外层 <div id="main-header" class="main-header">：
+   主题的脚本会给它切 .nav-open（移动端抽屉打开时顶栏要浮出来）。
+
+主题原生顺序是「搜索 + header_custom + aux_links」，这里改成「顶部导航 + 搜索」。
+搜索沿用主题自带的 components/search_header.html，
+这样站内搜索的索引与前端脚本（lunr / search-data.json）全部保持原样可用。
+{%- endcomment -%}
+<div id="main-header" class="main-header">
+  {%- include wb_topnav.html variant="bar" -%}
+
+  {%- if site.search_enabled != false -%}
+    <div class="wb-search">
+      {%- include components/search_header.html -%}
+    </div>
+  {%- endif -%}
+</div>
