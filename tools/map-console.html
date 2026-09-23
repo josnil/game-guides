@@ -422,6 +422,9 @@
 
   .hint b { color: var(--gold-400); }
 
+  /* 同一张卡片里第二段提示，跟上文拉开一点距离 */
+  .hint + .hint { margin-top: 0.55rem; }
+
   .stats {
     display: grid;
     grid-template-columns: 1fr auto;
@@ -606,6 +609,11 @@
         <span>新增打点</span><b class="d-add" id="nAdd">0</b>
         <span>浮窗文字</span><b class="d-lbl" id="nLabel">0</b>
       </div>
+      <p class="hint">
+        改动可能分散在多张地图上。要核对总数，
+        请看<b>左侧每个地点后面的数字</b>（那是该地点的最终打点数），
+        不要只看当前这一幅图。
+      </p>
       <div class="field">
         <label for="labelInput" id="labelFor">浮窗文字（在「加浮窗」模式下先点一个打点）</label>
         <input type="text" id="labelInput" placeholder="例如：隐藏宝箱 / 商店入口" disabled>
@@ -663,7 +671,6 @@
     if (!bag[id]) bag[id] = {};
     return bag[id];
   }
-  function bucketSize(bag, id) { return bag[id] ? Object.keys(bag[id]).length : 0; }
 
   // ---------- 从上次的改动里恢复（刷新不丢） ----------
   function loadSaved() {
@@ -749,8 +756,11 @@
       c.className = "mapitem__n";
       c.textContent = shownCount(id);
 
-      // 有未导出改动的，给个青点提示
-      var dirty = bucketSize(state.remove, id) || bucketSize(state.add, id) || bucketSize(state.label, id);
+      // 有未导出改动的，给个青点提示。
+      // 同样用 effectiveOverrides（而不是直接数 state 的键），
+      // 否则残留键会让一堆没改过的地图也亮起小点。
+      var eff = effectiveOverrides(id);
+      var dirty = eff.remove.length || eff.add.length || Object.keys(eff.label).length;
       b.appendChild(n);
       b.appendChild(c);
       if (dirty) {
@@ -951,16 +961,40 @@
   }
 
   // ---------- 统计 ----------
+  // 计数与画面共用 markersFor() 这一个数据源，保证两者永不打架。
+  // 早先版本是直接数 state.remove/add/label 的键；那样一旦 state 里残留了
+  // 「指向已不存在打点」的历史键（换过地图、游戏数据变过），
+  // 计数器就会和图上看到的对不上。统一口径后不会再出现这种割裂，
+  // 顺带让导出的覆盖文件只包含真正生效的条目。
+  //
+  // 说明：曾经误判过一次「计数不对」，实际是那个数字本身就是对的 ——
+  // 删除分散在多张地图上，只看当前地图是看不全的。
+  // 所以本页每个地点后面的数字才是判断依据，不要只看一幅图。
   function syncStats() {
     var r = 0, a = 0, l = 0;
     IDS.forEach(function (id) {
-      r += bucketSize(state.remove, id);
-      a += bucketSize(state.add, id);
-      l += bucketSize(state.label, id);
+      markersFor(id).forEach(function (m) {
+        if (m.kind === "removed") r++;
+        else if (m.kind === "added") a++;
+        if (m.label) l++;
+      });
     });
     document.getElementById("nRemove").textContent = r;
     document.getElementById("nAdd").textContent = a;
     document.getElementById("nLabel").textContent = l;
+  }
+
+  // 导出时也用同一套口径：只导出真正生效的条目，避免把残留键写成一份无效的覆盖文件
+  function effectiveOverrides(id) {
+    var remove = [], add = [], label = {};
+    markersFor(id).forEach(function (m) {
+      if (m.kind === "removed") remove.push(m.k);
+      if (m.kind === "added") add.push(m.k);
+      if (m.label) label[m.k] = m.label;
+    });
+    remove.sort();
+    add.sort();
+    return { remove: remove, add: add, label: label };
   }
 
   // ---------- 导出 YAML ----------
@@ -974,9 +1008,10 @@
 
     var any = false;
     IDS.forEach(function (id) {
-      var rk = Object.keys(state.remove[id] || {}).sort();
-      var ak = Object.keys(state.add[id] || {}).sort();
-      var lk = Object.keys(state.label[id] || {}).sort();
+      var eff = effectiveOverrides(id);
+      var rk = eff.remove;
+      var ak = eff.add;
+      var lk = Object.keys(eff.label).sort();
       if (!rk.length && !ak.length && !lk.length) return;
       any = true;
 
@@ -991,7 +1026,7 @@
       }
       if (lk.length) {
         lines.push("  label:");
-        lk.forEach(function (k) { lines.push('    "' + k + '": ' + state.label[id][k]); });
+        lk.forEach(function (k) { lines.push('    "' + k + '": ' + eff.label[k]); });
       }
       lines.push("");
     });
