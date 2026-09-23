@@ -714,15 +714,18 @@
   line-height: 1.6;
 }
 
-// 地点按钮：44×44 的命中区，内部只画一个小标记
+// 地点按钮：命中区比可见圆点大得多，方便鼠标点、也方便手指点
+//   命中区 64px：实测图上最接近的两个地点中心相距约 59px，
+//   64px（±32）不会盖住邻座的中心，所以不会互相抢 hover。
+//   可见圆点仍只有 15px，靠 __dot 绘制。
 .wb-poi {
   position: absolute;
   z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 64px;
+  height: 64px;
   transform: translate(-50%, -50%);
   text-decoration: none;
   cursor: pointer;
@@ -745,13 +748,9 @@
   }
 }
 
-// ⚠️ 临时诊断规则（验证完立刻删除）：强制名牌可见并染红，用来判断它到底画没画、画在哪
-.main-content a.wb-poi .wb-poi__label {
-  opacity: 1 !important;
-  background-color: red !important;
-}
-
-// 上面那条的权重修正（单独写出来，便于一眼看到它与主题规则的对抗关系）
+// ⚠️ 临时诊断规则已移除（诊断结论：名牌元素本身能正常绘制，位置与内容都正确）
+//
+// 权重修正（单独写出来，便于一眼看到它与主题规则的对抗关系）
 .main-content a.wb-poi {
   overflow: visible;
   text-overflow: clip;
