@@ -595,6 +595,42 @@ if (fs.existsSync(incDir)) {
 }
 
 // ============================================================
+// SCSS 里的 Sass 函数冲突
+// ------------------------------------------------------------
+// Sass 自带 min()/max() 函数，**小写**会被它在编译期求值：
+//     max-width: min(24rem, 78vw);   → 运行时单位不兼容，直接编译报错
+// 而 SCSS 编译失败会让整个 Jekyll 构建失败、站点不更新（本地还看不出来）。
+// 要传给浏览器必须写大写 Min()/Max()：Sass 认不出就原样输出，
+// 而 CSS 函数名大小写不敏感，浏览器照常按 min()/max() 处理。
+// （just-the-docs 主题自己也是这么绕的。）
+// ============================================================
+let scssFiles = [];
+function walkScss(dir) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walkScss(p);
+    else if (e.name.endsWith(".scss")) scssFiles.push(p);
+  }
+}
+const sassDir = path.join(ROOT, "_sass");
+if (fs.existsSync(sassDir)) {
+  walkScss(sassDir);
+  let hit = 0;
+  for (const f of scssFiles) {
+    const lines = fs.readFileSync(f, "utf8").split("\n");
+    lines.forEach((line, i) => {
+      const code = line.replace(/\/\/.*$/, "").replace(/\/\*.*?\*\//g, "");
+      if (/(^|[^\w-])(min|max)\(/.test(code)) {
+        E(rel(f), `第 ${i + 1} 行用了小写 ${/min\(/.test(code) ? "min()" : "max()"}：` +
+          `Sass 会在编译期求值并可能报错，导致整站构建失败。改成大写 Min()/Max()。`);
+        hit++;
+      }
+    });
+  }
+  if (hit === 0) console.log("  · SCSS：没有小写 min()/max()，不会与 Sass 内置函数冲突");
+}
+
+// ============================================================
 // 7. 其他
 // ============================================================
 if (fs.existsSync(path.join(ROOT, "CNAME"))) {

@@ -1548,7 +1548,12 @@
   z-index: 30;
   width: max-content;
   min-width: 15rem;
-  max-width: min(24rem, 78vw);
+  // ⚠️ 必须写大写的 Min(...)：Sass 有自己的 min()/max() 函数，
+  //    小写会被它当成待求值的表达式（rem 与 vw 不兼容 → 直接编译报错、整站构建失败）。
+  //    改成大写后 Sass 认不出这个函数，原样输出给浏览器，
+  //    而 CSS 的函数名大小写不敏感，仍然按 min() 生效。
+  //    just-the-docs 主题自己也是这么绕的（它用的是 Max(...)）。
+  max-width: Min(24rem, 78vw);
   padding: 0.7rem 0.85rem;
   border: 1px solid rgba(212, 160, 74, 0.5);
   border-radius: 10px;
