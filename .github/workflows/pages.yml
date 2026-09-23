@@ -36,16 +36,16 @@ jobs:
           bundler-cache: true
 
       # 首次运行时仓库里还没有 Gemfile.lock（本机没装 Ruby，本地生成不了）。
-      # 这一步只把它打印到日志里，作为「下面自动提交那步失败时」的手动兜底，
-      # 正常情况下你不需要看它。
+      # 这一步把它打印到日志里，作为「自动提交失败时」的手动兜底。
+      # 注意判断条件用「文件是否存在」——文件在就打印它的内容才有意义。
       - name: Print resolved Gemfile.lock (fallback record)
         run: |
           if [ -f Gemfile.lock ]; then
-            echo "Gemfile.lock 已提交，跳过"
-          else
-            echo "::group::CI 解析出的 Gemfile.lock（仅在需要手动提交时复制这一段）"
+            echo "::group::Gemfile.lock 内容（仅在自动提交失败、需要手动补时复制这一段）"
             cat Gemfile.lock
             echo "::endgroup::"
+          else
+            echo "工作区里没有 Gemfile.lock（bundler 没有生成），跳过打印"
           fi
 
       - name: Setup Pages
@@ -63,30 +63,37 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v5
 
-      # 首次运行时仓库里还没有 Gemfile.lock（本机没有 Ruby，本地生成不了）。
-      # 下面这一步会自动把 CI 解析出的锁定版本提交回仓库 —— 你不需要做任何事。
+      # 首次运行时把 CI 解析出的 Gemfile.lock 自动提交回仓库 —— 你不需要做任何事。
       # 用 GITHUB_TOKEN 推送的 commit 不会再次触发工作流，所以不会死循环。
       #
-      # 两个关键点：
-      #   1) checkout 在 push 事件下处于 detached HEAD，git push 必须显式写成 origin HEAD:main，
+      # 三个必须注意的点（都是实际踩过的坑）：
+      #   1) 判断条件必须用「git 是否已跟踪」，不能用「文件是否存在」：
+      #      bundler-cache 会把 Gemfile.lock 一起缓存并还原到工作区，
+      #      于是出现「文件在、仓库里没有」的状态，用 -f 判断会误判为已提交而直接跳过。
+      #   2) checkout 在 push 事件下处于 detached HEAD，push 必须显式写成 origin HEAD:main，
       #      否则会以 "You are not currently on a branch" 失败。
-      #   2) 不用 continue-on-error（它会把失败伪装成绿色），改成失败时打 ::warning::，
-      #      这样站点部署不受影响，但失败会在 Actions 页面明显标出来。
+      #   3) 仓库默认的 workflow 权限是只读，必须去
+      #      Settings → Actions → General → Workflow permissions 改成 Read and write，
+      #      否则这里会因 403 静默失败（所以失败时打 ::warning:: 让它显形，而不是 continue-on-error）。
       - name: Commit Gemfile.lock on first run
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          if [ -f Gemfile.lock ]; then
-            echo "Gemfile.lock 已存在，无需提交"
+          if git ls-files --error-unmatch Gemfile.lock >/dev/null 2>&1; then
+            echo "Gemfile.lock 已由仓库跟踪，无需提交"
+            exit 0
+          fi
+          if [ ! -f Gemfile.lock ]; then
+            echo "::warning title=Gemfile.lock 未生成::工作区里没有 Gemfile.lock，无法自动提交"
             exit 0
           fi
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Gemfile.lock
+          git add -f Gemfile.lock
           git commit -m "chore: 锁定依赖版本，写入 Gemfile.lock"
           if git push origin HEAD:main; then
             echo "已把 Gemfile.lock 提交回仓库"
           else
-            echo "::warning title=Gemfile.lock 未能自动提交::自动提交失败，请参考 README 第五节手动提交。这不影响站点部署。"
+            echo "::warning title=Gemfile.lock 未能自动提交::自动提交失败（常见原因：仓库的 Workflow permissions 仍是只读）。这不影响站点部署，也可参考 README 第五节手动提交。"
           fi
 
   deploy:
