@@ -43,9 +43,13 @@ DEFAULT_GAME = r"D:\steam\steamapps\common\暗渊崛起"
 # 脚本位于 <repo>/tools/，所以仓库根是上一级
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-TILE = 48          # RPG Maker MZ 的图块像素
-WORLD_MAX_W = 1800  # 世界地图压缩后最大宽度
-MAP_MAX_W = 1400    # 地点地图压缩后最大宽度
+TILE = 48           # RPG Maker MZ 的图块像素
+# 压缩档位说明：
+#   正文栏宽上限约 800px（主题的 content-width），所以 1400/1200 仍有 1.5~1.75 倍冗余，
+#   高分屏也够清晰，同时把最大的世界地图从约 720KB 压到约 450KB。
+#   颜色统一保留 256 色：源图真实颜色数在 2000~10000 之间，进一步降色会出色带而只省两成体积。
+WORLD_MAX_W = 1400   # 世界地图压缩后最大宽度
+MAP_MAX_W = 1200     # 地点地图压缩后最大宽度
 
 
 def log(msg=""):
