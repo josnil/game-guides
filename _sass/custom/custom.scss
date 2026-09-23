@@ -61,6 +61,32 @@
   border-bottom: 1px solid var(--wb-ink-700);
 }
 
+// 主题给 .main 加了 max-width: $content-width(50rem)。
+// 顶栏改深色之后，这个限宽会让顶栏在右侧提前结束，露出一条浅色缝。
+// 放开 .main 的宽度，让顶栏一直延伸到窗口右缘；
+// 正文的阅读宽度仍由 .main-content-wrap 上的 container 混入量控制，不受影响。
+@include mq(md) {
+  .main {
+    max-width: none;
+  }
+}
+
+// 主题在 md+ 把侧栏设成 align-items: flex-end，并在 lg 把子元素限宽成 $nav-width，
+// 于是侧栏内部左侧空出一大片（深色底上尤其明显）。改成让内容铺满侧栏宽度。
+@include mq(md) {
+  .side-bar {
+    align-items: stretch;
+  }
+}
+
+@include mq(lg) {
+  .site-nav,
+  .site-header,
+  .site-footer {
+    width: 100%;
+  }
+}
+
 // 侧栏品牌名在深色上要提亮（主题默认用的是深色标题色）
 .site-title {
   color: var(--wb-on-ink);
@@ -200,6 +226,7 @@
 
 .wb-mod__title {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 0.5rem;
   margin: 1.5rem 0 0.45rem;
@@ -212,7 +239,14 @@
   line-height: 1.3;
 }
 
+// 中文标题不许在字间断行（否则「宠物培养建议」会被拆成两行）
+.wb-mod__zh {
+  white-space: nowrap;
+}
+
 .wb-mod__en {
+  flex: 0 0 auto;
+  white-space: nowrap;
   color: rgba(212, 160, 74, 0.55);
   font-family: var(--wb-font-num);
   font-size: 0.62rem;
@@ -394,11 +428,16 @@
 }
 
 // ---------- 4. 搜索框（适配深色） ----------
+// min-width:0 是关键：flex 子项默认 min-width:auto，输入框会把顶栏顶破。
 .search {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .search-input {
+  min-width: 0;
+  max-width: 100%;
   color: var(--wb-on-ink);
   background-color: var(--wb-ink-800);
   border: 1px solid var(--wb-ink-700);
