@@ -745,6 +745,12 @@
   }
 }
 
+// ⚠️ 临时诊断规则（验证完立刻删除）：强制名牌可见并染红，用来判断它到底画没画、画在哪
+.main-content a.wb-poi .wb-poi__label {
+  opacity: 1 !important;
+  background-color: red !important;
+}
+
 // 上面那条的权重修正（单独写出来，便于一眼看到它与主题规则的对抗关系）
 .main-content a.wb-poi {
   overflow: visible;
