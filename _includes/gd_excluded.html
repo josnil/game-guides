@@ -1,0 +1,14 @@
+{%- comment -%}
+说明被排除的条目。
+  用法： {% include gd_excluded.html kind="weapons" %}
+  被排除的是「分类分隔项」与「数据库预留的空占位」（没有名称也没有内容）。
+  如实说明，免得读者以为数据不全。
+{%- endcomment -%}
+{%- assign gdEx = site.data.gamedata.meta.excluded -%}
+{%- assign gdExN = gdEx[include.kind] -%}
+{%- if gdExN and gdExN > 0 -%}
+  <p class="gd-range">
+    游戏数据库里另有 <b>{{ gdExN }}</b> 条<strong>空占位</strong>条目（预留空位，既没有名称也没有内容）
+    未列入本表。
+  </p>
+{%- endif -%}

@@ -16,6 +16,8 @@ permalink: /data/skills/
 
 类型：{{ gd.types.skillTypes | slice: 1, 5 | join: ' / ' }}。
 
+{% include gd_excluded.html kind="skills" %}
+
 <div data-gd-table>
   <div class="gd-toolbar">
     <label class="sr-only" for="f-skills">按名称筛选技能</label>

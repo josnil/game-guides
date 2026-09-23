@@ -13,6 +13,8 @@ permalink: /data/weapons/
 
 共 **{{ items.size }}** 件。属性显示为 **下界 ~ 上界**（见 [游戏数据总览]({{ '/data/' | relative_url }}) 里的区间说明）。
 
+{% include gd_excluded.html kind="weapons" %}
+
 <div data-gd-table>
   <div class="gd-toolbar">
     <label class="sr-only" for="f-weapons">按名称筛选武器</label>

@@ -13,6 +13,8 @@ permalink: /data/states/
 
 共 **{{ items.size }}** 条（其中 {{ withDesc.size }} 条有说明文字）。
 
+{% include gd_excluded.html kind="states" %}
+
 <div data-gd-table>
   <div class="gd-toolbar">
     <label class="sr-only" for="f-states">按名称或说明筛选状态</label>

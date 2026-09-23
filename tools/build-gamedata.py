@@ -81,6 +81,23 @@ def is_separator(name):
     return bool(name) and name.startswith("-----")
 
 
+def keep_entry(item, include_unnamed=False):
+    """这条数据要不要收录。
+
+    - 分类分隔条目（----- 开头）永远排除；
+    - 名字为空的占位条目：RPG Maker 的数据库会预留大量空位，
+      它们没有任何内容，收进来只会污染表格 —— 默认排除；
+    - 加 --include-unnamed 可改为收录（技能里有 154 条无名但有公式的内部技能，
+      想看全量时可以打开）。
+    """
+    nm = (item.get("name") or "").strip()
+    if is_separator(nm):
+        return False
+    if not nm:
+        return include_unnamed
+    return True
+
+
 def note_tags(note):
     """单行形式 <Tag: value> 与 <Tag> -> {tag: [values]}"""
     out = {}
@@ -137,6 +154,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--game", default=os.environ.get("AYJQ_GAME", DEFAULT_GAME))
     ap.add_argument("--no-icons", action="store_true")
+    ap.add_argument("--include-unnamed", action="store_true",
+                    help="连名字为空的条目也收进来（默认排除）")
     args = ap.parse_args()
 
     game = args.game
@@ -363,7 +382,7 @@ def main():
 
     # ---------- 4. 装备 ----------
     def build_equip(item, kind):
-        if not item or is_separator(item.get("name")):
+        if not item or not keep_entry(item, args.include_unnamed):
             return None
         note = item.get("note") or ""
         params = item.get("params") or [0] * 8
@@ -461,7 +480,7 @@ def main():
     # ---------- 5. 技能 ----------
     skills = []
     for s in skills_raw:
-        if not s or is_separator(s.get("name")):
+        if not s or not keep_entry(s, args.include_unnamed):
             continue
         note = s.get("note") or ""
         dmg = s.get("damage") or {}
@@ -496,7 +515,7 @@ def main():
     # ---------- 6. 状态 ----------
     states = []
     for s in states_raw:
-        if not s or is_separator(s.get("name")):
+        if not s or not keep_entry(s, args.include_unnamed):
             continue
         note = s.get("note") or ""
         desc = s.get("description")
@@ -805,6 +824,15 @@ def main():
             "highMul": round((1 + FLOAT_PCT / 100.0) * enhance_mult, 3),
         },
         "icons": icon_meta,
+        # 被排除的条目数（分隔项 + 空白占位 + 无名的内部技能）。
+        # 页面会如实说明，免得读者以为数据不全。
+        "excluded": {
+            "weapons": len([x for x in weapons_raw if x]) - len(weapons),
+            "armors": len([x for x in armors_raw if x]) - len(armors),
+            "skills": len([x for x in skills_raw if x]) - len(skills),
+            "states": len([x for x in states_raw if x]) - len(states),
+        },
+        "includeUnnamed": bool(args.include_unnamed),
         "counts": {
             "weapons": len(weapons), "armors": len(armors), "sets": len(sets),
             "wildcard": len(wildcard), "skills": len(skills),
