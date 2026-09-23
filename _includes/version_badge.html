@@ -7,13 +7,13 @@
 就显示红色的「可能已过期」提示，否则显示绿色徽章。
 没有传版本号时（例如分类索引页）不渲染任何内容。
 {%- endcomment -%}
-{%- assign v = include.version | default: page.game_version -%}
-{%- if v and v != "" -%}
+{%- assign vgVer = include.version | default: page.game_version -%}
+{%- if vgVer and vgVer != "" -%}
   {%- assign supported = site.data.versions.supported -%}
-  {%- assign meta = site.data.versions.history | where: "id", v | first -%}
+  {%- assign vgMeta = site.data.versions.history | where: "id", vgVer | first -%}
   {%- assign label = meta.name | default: v -%}
-  {%- if supported contains v -%}
-    {%- if meta.status == "current" -%}
+  {%- if supported contains vgVer -%}
+    {%- if vgMeta.status == "current" -%}
 <span class="vg-badge vg-badge--ok">适用版本 {{ label }}（当前版本）</span>
     {%- else -%}
 <span class="vg-badge vg-badge--ok">适用版本 {{ label }}</span>

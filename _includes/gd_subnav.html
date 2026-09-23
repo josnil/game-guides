@@ -1,14 +1,20 @@
 {%- comment -%}
 游戏数据各页之间的快捷导航。
   用法： {% include gd_subnav.html active="weapons" %}
+
+⚠️ 这里的局部变量一律加 gdNav 前缀。
+   Jekyll 的 {% include %} 与外层**共享作用域**：include 里的 assign 会覆盖父级同名变量。
+   曾经这里用了变量名 `items`，把页面顶部的 `items`（武器列表）覆盖成了 7 个导航项，
+   结果表格渲染出 7 行空数据 —— 而且不报任何错，只是内容凭空消失。
+   所以包含文件里的变量名必须加前缀，别用 items / data / list 这类通用名。
 {%- endcomment -%}
-{%- assign items = "weapons|武器,armors|防具,sets|套装,wildcard|万能散搭装,skills|技能,states|状态,pets|宠物" | split: "," -%}
+{%- assign gdNavRaw = "weapons|武器,armors|防具,sets|套装,wildcard|万能散搭装,skills|技能,states|状态,pets|宠物" | split: "," -%}
 <nav class="gd-subnav" aria-label="游戏数据分类">
   <a class="gd-subnav__item{% if include.active == nil or include.active == '' %} is-here{% endif %}"
      href="{{ '/data/' | relative_url }}">总览</a>
-  {%- for it in items -%}
-    {%- assign parts = it | split: "|" -%}
-    <a class="gd-subnav__item{% if include.active == parts[0] %} is-here{% endif %}"
-       href="{{ '/data/' | append: parts[0] | append: '/' | relative_url }}">{{ parts[1] }}</a>
+  {%- for gdNavItem in gdNavRaw -%}
+    {%- assign gdNavParts = gdNavItem | split: "|" -%}
+    <a class="gd-subnav__item{% if include.active == gdNavParts[0] %} is-here{% endif %}"
+       href="{{ '/data/' | append: gdNavParts[0] | append: '/' | relative_url }}">{{ gdNavParts[1] }}</a>
   {%- endfor -%}
 </nav>

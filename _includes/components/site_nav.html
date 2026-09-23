@@ -7,7 +7,7 @@
 三个模块，数据全部来自 _data/（不用改这个文件就能增删条目）：
   地图         ← _data/maps.json（由 tools/build-maps.py 从游戏 data/ 生成）
   阶段攻略      ← _data/stages.yml
-  宠物培养建议   ← _data/pets.yml
+  宠物培养建议   ← _data/wbPetItems.yml
 {%- endcomment -%}
 {%- assign wm = site.data.maps.world -%}
 <nav aria-label="攻略目录" id="site-nav" class="site-nav">
@@ -81,10 +81,10 @@
       <span class="wb-mod__en">Companions</span>
     </h2>
 
-    {%- assign pets = site.data.pets.items -%}
-    {%- if pets and pets.size > 0 -%}
+    {%- assign wbPetItems = site.data.pets.items -%}
+    {%- if wbPetItems and wbPetItems.size > 0 -%}
       <ul class="wb-mod__list">
-        {%- for item in pets -%}
+        {%- for item in wbPetItems -%}
           {%- assign is_here = false -%}
           {%- if page.url == item.url -%}{%- assign is_here = true -%}{%- endif -%}
           <li class="wb-item wb-item--slim{% if is_here %} is-here{% endif %}">

@@ -5,9 +5,9 @@
   输出： 攻击 20~44 · 防御 8~18
   上下界相等时只显示一个数，避免「20~20」这种噪音。
 {%- endcomment -%}
-{%- for pair in include.range -%}
-  {%- assign v = pair[1] -%}
-  <span class="gd-tag">{{ v.cn }}
-    {%- if v.low == v.high %} {{ v.low }}{% else %} {{ v.low }}~{{ v.high }}{% endif -%}
+{%- for gdRangePair in include.range -%}
+  {%- assign gdRangeVal = gdRangePair[1] -%}
+  <span class="gd-tag">{{ gdRangeVal.cn }}
+    {%- if gdRangeVal.low == gdRangeVal.high %} {{ gdRangeVal.low }}{% else %} {{ gdRangeVal.low }}~{{ gdRangeVal.high }}{% endif -%}
   </span>
 {%- endfor -%}
