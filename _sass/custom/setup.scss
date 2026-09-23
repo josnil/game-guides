@@ -63,5 +63,10 @@ $search-result-preview-color: $wb-text-muted !default;
 // 侧栏品牌条用的是同一个变量，两边高度对齐，深色框架的顶边才是一条直线。
 $header-height: 4rem !default;
 
-// $nav-width: 16.5rem;
+// 侧边栏宽度：主题默认 16.5rem，且在 lg 断点还会用公式吃掉视口的余量
+// （1456px 视口下能撑到约 460px）。这里收窄成固定窄栏。
+// 11rem = 176px，放得下「五毒沼泽入口」这种 6 字条目 + 图标。
+$nav-width: 11rem !default;
+$nav-width-md: 10rem !default;
+
 // $content-width: 50rem;

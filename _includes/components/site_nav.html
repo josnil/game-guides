@@ -1,104 +1,168 @@
 {%- comment -%}
-覆盖主题默认的 components/site_nav.html —— 侧边栏的目录本体。
+覆盖主题默认的 components/site_nav.html —— 侧边栏本体。
 
 ⚠️ 根节点必须保持 <nav id="site-nav" class="site-nav">：
    主题的样式与移动端抽屉开合脚本都依赖这个 id / class。
 
-三个模块，数据全部来自 _data/（不用改这个文件就能增删条目）：
-  地图         ← _data/maps.json（由 tools/build-maps.py 从游戏 data/ 生成）
-  阶段攻略      ← _data/stages.yml
-  宠物培养建议   ← _data/wbPetItems.yml
+⚠️ 本文件的所有局部变量都带 wb 前缀。Jekyll 的 include 与外层共享作用域，
+   include 里 assign 的同名变量会覆盖调用页面的变量，而且不报错。
+   （曾经因为一个通用变量名，让整张表格渲染成空行。）
+
+=====================================================================
+ 侧边栏显示什么：跟着顶部导航走
+=====================================================================
+ 不再固定显示地图。判定顺序（**先判更具体的，避免前缀互相包含**）：
+
+   page.url                          →  分区     →  索引内容
+   ───────────────────────────────────────────────────────────────
+   /data/…（含 /data/pets/ 等）       →  data     → 总览 + 武器/防具/套装/
+                                                  万能散搭/技能/状态/宠物
+   /map/…                            →  map      → 世界大地图 + 各地点
+   /stages/…                         →  stages   → 各大陆
+   /pets/                            →  petcare  → 宠物培养建议（条目待补）
+   /npcs/                            →  npcs     → 功能NPC汇总（条目待补）
+   /（首页）                          →  home     → 站点导航
+   其它（/versions/、/outdated/、攻略页）→ other   → 站点导航
+
+ ⚠️ /data/pets/ 同时含 "/data/" 与 "/pets/" 两个片段，
+    所以 data 必须排在 petcare 前面判断，否则会串到宠物培养建议去。
+=====================================================================
 {%- endcomment -%}
-{%- assign wm = site.data.maps.world -%}
-<nav aria-label="攻略目录" id="site-nav" class="site-nav">
 
-  {%- comment -%} ========== 模块一：地图 ========== {%- endcomment -%}
+{%- assign wbUrl = page.url | default: '/' -%}
+{%- assign wbSec = 'other' -%}
+{%- if wbUrl == '/' -%}
+  {%- assign wbSec = 'home' -%}
+{%- elsif wbUrl contains '/data/' -%}
+  {%- assign wbSec = 'data' -%}
+{%- elsif wbUrl contains '/map/' -%}
+  {%- assign wbSec = 'map' -%}
+{%- elsif wbUrl contains '/stages/' -%}
+  {%- assign wbSec = 'stages' -%}
+{%- elsif wbUrl contains '/pets/' -%}
+  {%- assign wbSec = 'petcare' -%}
+{%- elsif wbUrl contains '/npcs/' -%}
+  {%- assign wbSec = 'npcs' -%}
+{%- endif -%}
+
+{%- case wbSec -%}
+  {%- when 'data' -%}{%- assign wbTitle = '游戏数据' -%}{%- assign wbTitleEn = 'Data' -%}
+  {%- when 'map' -%}{%- assign wbTitle = '地图' -%}{%- assign wbTitleEn = 'Maps' -%}
+  {%- when 'stages' -%}{%- assign wbTitle = '阶段攻略' -%}{%- assign wbTitleEn = 'Stages' -%}
+  {%- when 'petcare' -%}{%- assign wbTitle = '宠物培养建议' -%}{%- assign wbTitleEn = 'Companions' -%}
+  {%- when 'npcs' -%}{%- assign wbTitle = '功能NPC汇总' -%}{%- assign wbTitleEn = 'NPCs' -%}
+  {%- else -%}{%- assign wbTitle = '站点导航' -%}{%- assign wbTitleEn = 'Site' -%}
+{%- endcase -%}
+
+<nav aria-label="页面索引" id="site-nav" class="site-nav">
+
   <section class="wb-mod">
     <h2 class="wb-mod__title">
-      <span class="wb-mod__zh">地图</span>
-      <span class="wb-mod__en">Maps</span>
-      <span class="wb-mod__count">{{ site.data.maps.places.size }}</span>
+      <span class="wb-mod__zh">{{ wbTitle }}</span>
+      <span class="wb-mod__en">{{ wbTitleEn }}</span>
     </h2>
 
-    <a class="wb-worldlink{% if page.url == wm.url %} is-here{% endif %}"
-       href="{{ wm.url | relative_url }}">
-      <span class="wb-worldlink__mark" aria-hidden="true"></span>
-      <span class="wb-worldlink__txt">{{ wm.title }}</span>
-    </a>
+    {%- case wbSec -%}
 
-    <ul class="wb-mod__list wb-scroll">
-      {%- for p in site.data.maps.places -%}
-        {%- assign is_here = false -%}
-        {%- if p.url and page.url == p.url -%}{%- assign is_here = true -%}{%- endif -%}
-        <li class="wb-item wb-item--slim{% if is_here %} is-here{% endif %}">
-          {%- if p.url -%}
-            <a class="wb-item__link" href="{{ p.url | relative_url }}">
-              <span class="wb-item__body">
-                <span class="wb-item__name">{{ p.title }}</span>
-              </span>
-            </a>
-          {%- else -%}
-            <span class="wb-item__link wb-item__link--off">
-              <span class="wb-item__body">
-                <span class="wb-item__name">{{ p.title }}</span>
-                <span class="wb-item__sub">地图数据未收录</span>
-              </span>
-            </span>
-          {%- endif -%}
-        </li>
-      {%- endfor -%}
-    </ul>
-  </section>
+      {%- comment -%} ---------- 游戏数据 ---------- {%- endcomment -%}
+      {%- when 'data' -%}
+        <ul class="wb-mod__list">
+          {%- for wbIt in site.data.sidebar.data -%}
+            {%- assign wbHere = false -%}
+            {%- if wbUrl == wbIt.url -%}{%- assign wbHere = true -%}{%- endif -%}
+            <li class="wb-item wb-item--slim{% if wbHere %} is-here{% endif %}">
+              <a class="wb-item__link" href="{{ wbIt.url | relative_url }}">
+                <span class="wb-item__body"><span class="wb-item__name">{{ wbIt.title }}</span></span>
+              </a>
+            </li>
+          {%- endfor -%}
+        </ul>
 
-  {%- comment -%} ========== 模块二：阶段攻略 ========== {%- endcomment -%}
-  <section class="wb-mod">
-    <h2 class="wb-mod__title">
-      <span class="wb-mod__zh">阶段攻略</span>
-      <span class="wb-mod__en">Stages</span>
-    </h2>
+      {%- comment -%} ---------- 地图 ---------- {%- endcomment -%}
+      {%- when 'map' -%}
+        {%- assign wbWm = site.data.maps.world -%}
+        <a class="wb-worldlink{% if wbUrl == wbWm.url %} is-here{% endif %}"
+           href="{{ wbWm.url | relative_url }}">
+          <span class="wb-worldlink__mark" aria-hidden="true"></span>
+          <span class="wb-worldlink__txt">{{ wbWm.title }}</span>
+        </a>
+        <ul class="wb-mod__list wb-scroll">
+          {%- for wbP in site.data.maps.places -%}
+            {%- assign wbHere = false -%}
+            {%- if wbP.url and wbUrl == wbP.url -%}{%- assign wbHere = true -%}{%- endif -%}
+            <li class="wb-item wb-item--slim{% if wbHere %} is-here{% endif %}">
+              {%- if wbP.url -%}
+                <a class="wb-item__link" href="{{ wbP.url | relative_url }}">
+                  <span class="wb-item__body"><span class="wb-item__name">{{ wbP.title }}</span></span>
+                </a>
+              {%- else -%}
+                <span class="wb-item__link wb-item__link--off">
+                  <span class="wb-item__body">
+                    <span class="wb-item__name">{{ wbP.title }}</span>
+                    <span class="wb-item__sub">地图数据未收录</span>
+                  </span>
+                </span>
+              {%- endif -%}
+            </li>
+          {%- endfor -%}
+        </ul>
 
-    <ul class="wb-mod__list">
-      {%- for stage in site.data.stages -%}
-        {%- assign stage_url = '/stages/' | append: stage.slug | append: '/' -%}
-        {%- assign is_here = false -%}
-        {%- if page.url == stage_url -%}{%- assign is_here = true -%}{%- endif -%}
-        <li class="wb-item{% if is_here %} is-here{% endif %}">
-          <a class="wb-item__link" href="{{ stage_url | relative_url }}">
-            <span class="wb-item__num" aria-hidden="true">{{ stage.index }}</span>
-            <span class="wb-item__body">
-              <span class="wb-item__name">{{ stage.name }}</span>
-            </span>
-          </a>
-        </li>
-      {%- endfor -%}
-    </ul>
-  </section>
+      {%- comment -%} ---------- 阶段攻略 ---------- {%- endcomment -%}
+      {%- when 'stages' -%}
+        <ul class="wb-mod__list">
+          {%- for wbSt in site.data.stages -%}
+            {%- assign wbStUrl = '/stages/' | append: wbSt.slug | append: '/' -%}
+            {%- assign wbHere = false -%}
+            {%- if wbUrl == wbStUrl -%}{%- assign wbHere = true -%}{%- endif -%}
+            <li class="wb-item{% if wbHere %} is-here{% endif %}">
+              <a class="wb-item__link" href="{{ wbStUrl | relative_url }}">
+                <span class="wb-item__num" aria-hidden="true">{{ wbSt.index }}</span>
+                <span class="wb-item__body">
+                  <span class="wb-item__name">{{ wbSt.name }}</span>
+                </span>
+              </a>
+            </li>
+          {%- endfor -%}
+        </ul>
 
-  {%- comment -%} ========== 模块三：宠物培养建议 ========== {%- endcomment -%}
-  <section class="wb-mod">
-    <h2 class="wb-mod__title">
-      <span class="wb-mod__zh">宠物培养建议</span>
-      <span class="wb-mod__en">Companions</span>
-    </h2>
+      {%- comment -%} ---------- 宠物培养建议 ---------- {%- endcomment -%}
+      {%- when 'petcare' -%}
+        {%- assign wbPetItems = site.data.pets.items -%}
+        {%- if wbPetItems and wbPetItems.size > 0 -%}
+          <ul class="wb-mod__list">
+            {%- for wbIt in wbPetItems -%}
+              {%- assign wbHere = false -%}
+              {%- if wbUrl == wbIt.url -%}{%- assign wbHere = true -%}{%- endif -%}
+              <li class="wb-item wb-item--slim{% if wbHere %} is-here{% endif %}">
+                <a class="wb-item__link" href="{{ wbIt.url | relative_url }}">
+                  <span class="wb-item__body"><span class="wb-item__name">{{ wbIt.title }}</span></span>
+                </a>
+              </li>
+            {%- endfor -%}
+          </ul>
+        {%- else -%}
+          <p class="wb-mod__empty">条目待补充</p>
+        {%- endif -%}
 
-    {%- assign wbPetItems = site.data.pets.items -%}
-    {%- if wbPetItems and wbPetItems.size > 0 -%}
-      <ul class="wb-mod__list">
-        {%- for item in wbPetItems -%}
-          {%- assign is_here = false -%}
-          {%- if page.url == item.url -%}{%- assign is_here = true -%}{%- endif -%}
-          <li class="wb-item wb-item--slim{% if is_here %} is-here{% endif %}">
-            <a class="wb-item__link" href="{{ item.url | relative_url }}">
-              <span class="wb-item__body">
-                <span class="wb-item__name">{{ item.title }}</span>
-              </span>
-            </a>
-          </li>
-        {%- endfor -%}
-      </ul>
-    {%- else -%}
-      <p class="wb-mod__empty">条目待补充</p>
-    {%- endif -%}
+      {%- comment -%} ---------- 功能NPC汇总 ---------- {%- endcomment -%}
+      {%- when 'npcs' -%}
+        <p class="wb-mod__empty">条目待补充</p>
+
+      {%- comment -%} ---------- 首页与其它页面：站点导航 ---------- {%- endcomment -%}
+      {%- else -%}
+        <ul class="wb-mod__list">
+          {%- for wbIt in site.data.sidebar.site -%}
+            {%- assign wbHere = false -%}
+            {%- if wbUrl == wbIt.url -%}{%- assign wbHere = true -%}{%- endif -%}
+            <li class="wb-item wb-item--slim{% if wbHere %} is-here{% endif %}">
+              <a class="wb-item__link" href="{{ wbIt.url | relative_url }}">
+                <span class="wb-item__body"><span class="wb-item__name">{{ wbIt.title }}</span></span>
+              </a>
+            </li>
+          {%- endfor -%}
+        </ul>
+
+    {%- endcase -%}
   </section>
 
 </nav>

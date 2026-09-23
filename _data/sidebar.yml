@@ -1,0 +1,38 @@
+# ============================================================
+# 侧边栏的内容索引
+# ------------------------------------------------------------
+# 侧边栏不再固定显示地图，而是**跟着顶部导航走**：
+# 当前页面属于哪个分区，就显示那个分区的索引
+# （分区由 page.url 前缀判定，见 _includes/components/site_nav.html 顶部）。
+#
+# 这里只放「静态」的两份索引：
+#   site —— 首页与其它未归类的页面
+#   data —— 游戏数据
+# 地图与阶段攻略的索引条目来自各自的数据文件，不在这里维护：
+#   地图     ← _data/maps.json   （世界大地图 + 各地点）
+#   阶段攻略 ← _data/stages.yml  （各大陆）
+# ============================================================
+
+site:
+  - title: 按版本查攻略
+    url: /versions/
+  - title: 待复核清单
+    url: /outdated/
+
+data:
+  - title: 总览
+    url: /data/
+  - title: 武器
+    url: /data/weapons/
+  - title: 防具
+    url: /data/armors/
+  - title: 套装
+    url: /data/sets/
+  - title: 万能散搭装
+    url: /data/wildcard/
+  - title: 技能
+    url: /data/skills/
+  - title: 状态
+    url: /data/states/
+  - title: 宠物
+    url: /data/pets/

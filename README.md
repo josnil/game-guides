@@ -328,6 +328,31 @@ python tools/build-gamedata.py      # 等价于 npm run gamedata
   三个未定义的套装名（不会触发任何加成），脚本运行时提示，页面上也写明。
   这是游戏数据的问题、不是提取遗漏 —— **不要**为了让页面"好看"而把它们藏起来。
 
+### 4.6 导航结构：顶栏决定分区，侧栏显示该分区的索引
+
+**顶栏**（`_data/site_nav.yml`）是站点的一级分区，共 6 项；
+**侧栏**不再固定显示地图，而是**跟着当前页面所属的分区走**。
+
+| 顶栏项 | 网址 | 侧栏显示的内容索引 | 索引来源 |
+| --- | --- | --- | --- |
+| 首页 | `/` | 站点导航（按版本查攻略、待复核清单） | `_data/sidebar.yml` |
+| 游戏地图 | `/map/` | 世界大地图 + 各地点 | `_data/maps.json` |
+| 游戏数据 | `/data/` | 总览 + 武器/防具/套装/万能散搭/技能/状态/宠物 | `_data/sidebar.yml` |
+| 功能NPC汇总 | `/npcs/` | 条目待补充 | — |
+| 阶段攻略 | `/stages/` | 各大陆（01~06） | `_data/stages.yml` |
+| 宠物培养建议 | `/pets/` | 条目待补充 | `_data/pets.yml` |
+
+其它页面（`/versions/`、`/outdated/`、各篇攻略）归入「站点导航」。
+
+判定逻辑在 `_includes/components/site_nav.html` 顶部，**按 `page.url` 的网址前缀匹配**。
+⚠️ 判断顺序不能乱：`/data/pets/` 同时含有 `/data/` 和 `/pets/` 两个片段，
+所以 `data` 必须排在 `petcare` 前面，否则会串到宠物培养建议去。
+
+**侧边栏宽度**：主题默认 16.5rem，且宽屏下会用公式吃掉视口余量（1456px 时约 460px）。
+本站改成固定窄栏 **11rem（176px）**，相关变量与紧凑尺寸在
+`_sass/custom/setup.scss`（`$nav-width` / `$nav-width-md`）与
+`_sass/custom/custom.scss` 的第 10 节。
+
 ---
 
 ## 五、推送之后：从 Actions 到站点上线

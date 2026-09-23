@@ -87,6 +87,20 @@
   }
 }
 
+// 主题在 lg 断点会用 calc 把「视口减去侧栏与内容宽度后的余量」再加进侧栏，
+// 于是宽屏下侧栏能撑到 460px 左右。这里改成固定窄栏：
+// 侧栏只占 $nav-width，余下的空间全部让给内容区（内容本身有 max-width 约束，不会散开）。
+@include mq(lg) {
+  .side-bar {
+    width: $nav-width;
+    min-width: 0;
+  }
+
+  .side-bar + .main {
+    margin-left: $nav-width;
+  }
+}
+
 // 侧栏品牌名在深色上要提亮（主题默认用的是深色标题色）
 .site-title {
   color: var(--wb-on-ink);
@@ -1352,6 +1366,110 @@
     color: var(--wb-text-dark);
     font-weight: 600;
   }
+}
+
+// ============================================================
+// 10. 窄侧栏的紧凑尺寸
+// ------------------------------------------------------------
+// 侧栏从约 460px 收窄到 176px（$nav-width: 11rem），
+// 原来的字号与留白在这个宽度下会挤成一团，这里统一重新定标。
+// 触摸目标仍保持 44px 下限，不为了窄而牺牲可点性。
+// ============================================================
+
+.site-title {
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+}
+
+.wb-mod {
+  padding: 0 0.35rem 0.2rem;
+}
+
+.wb-mod__title {
+  gap: 0.3rem;
+  margin: 1.1rem 0 0.35rem;
+  padding: 0 0.5rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.03em;
+}
+
+.wb-mod__en {
+  font-size: 0.54rem;
+  letter-spacing: 0.12em;
+}
+
+.wb-mod__count {
+  padding: 0 0.35rem;
+  font-size: 0.62rem;
+}
+
+.wb-mod__empty {
+  margin: 0 0.5rem;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.73rem;
+}
+
+.wb-item__link {
+  grid-template-columns: 1.7rem 1fr;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem 0.35rem 0.4rem;
+  border-radius: 0 8px 8px 0;
+}
+
+// 窄栏下单列条目（地图地点、数据子项）不需要额外左缩进
+.wb-item--slim .wb-item__link {
+  padding-left: 0.55rem;
+}
+
+.wb-item__num {
+  font-size: 1.05rem;
+}
+
+.wb-item__name {
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.wb-item__sub {
+  font-size: 0.65rem;
+}
+
+.wb-worldlink {
+  gap: 0.4rem;
+  min-height: 42px;
+  margin: 0 0.05rem 0.3rem;
+  padding: 0.4rem 0.55rem;
+}
+
+.wb-worldlink__mark {
+  width: 8px;
+  height: 8px;
+}
+
+.wb-worldlink__txt {
+  font-size: 0.85rem;
+}
+
+// 地点多，限高滚动区也相应压低
+.wb-scroll {
+  max-height: 18rem;
+}
+
+// 抽屉里的顶部导航同样收紧
+.wb-nav--drawer {
+  padding: 0 0.35rem;
+
+  .wb-nav__link {
+    padding: 0.5rem 0.55rem;
+  }
+}
+
+.wb-nav__txt {
+  font-size: 0.88rem;
+}
+
+.wb-nav__desc {
+  font-size: 0.63rem;
 }
 
 // ---------- 8.3 侧边栏里的地图模块 ----------
