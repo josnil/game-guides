@@ -730,6 +730,13 @@
   background: none;
   border: 0;
   padding: 0;
+  // ⚠️ 必须显式放开 overflow：
+  //    主题有一条 `.main-content a { overflow: hidden; text-overflow: ellipsis }`
+  //    （给超长链接加省略号用的）。地点按钮也落在 .main-content 里，
+  //    会被这条规则裁掉自己 44px 盒子之外的一切 —— 悬停名牌正好在外面，于是永远不显示。
+  //    这个坑很隐蔽：DOM 对、CSS 对、hover 也生效（圆点会放大），只有名牌被吃掉。
+  overflow: visible;
+  text-overflow: clip;
 
   &:hover,
   &:focus-visible {
