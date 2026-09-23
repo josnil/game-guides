@@ -730,11 +730,12 @@
   background: none;
   border: 0;
   padding: 0;
-  // ⚠️ 必须显式放开 overflow：
+  // ⚠️ overflow 必须用「.main-content a.wb-poi」这种写法才压得住主题。
   //    主题有一条 `.main-content a { overflow: hidden; text-overflow: ellipsis }`
-  //    （给超长链接加省略号用的）。地点按钮也落在 .main-content 里，
-  //    会被这条规则裁掉自己 44px 盒子之外的一切 —— 悬停名牌正好在外面，于是永远不显示。
-  //    这个坑很隐蔽：DOM 对、CSS 对、hover 也生效（圆点会放大），只有名牌被吃掉。
+  //    （给超长链接加省略号）——它的权重是 (0,1,1)，
+  //    而单写 `.wb-poi { overflow: visible }` 只有 (0,1,0)，权重更低，等于没写。
+  //    后果极其隐蔽：DOM 对、CSS 里也能搜到这条规则、hover 也生效（圆点会放大），
+  //    但悬停名牌位于 44px 命中区之外，被静默裁掉，永远不出现。
   overflow: visible;
   text-overflow: clip;
 
@@ -742,6 +743,12 @@
   &:focus-visible {
     z-index: 5; // 悬停时压住邻近标记，名牌才不会被盖住
   }
+}
+
+// 上面那条的权重修正（单独写出来，便于一眼看到它与主题规则的对抗关系）
+.main-content a.wb-poi {
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .wb-poi__dot {
