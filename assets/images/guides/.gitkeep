@@ -1,0 +1,7 @@
+# 攻略配图目录
+#
+# 约定：一篇文章一个子目录，用文章的文件名（slug）命名。
+#   assets/images/guides/shadow-tree/01-一阶段站位.png
+#
+# 引用方式（必须走 Liquid 的 relative_url，否则换域名或换仓库形态后图片会 404）：
+#   ![一阶段站位]({{ '/assets/images/guides/shadow-tree/01-一阶段站位.png' | relative_url }})

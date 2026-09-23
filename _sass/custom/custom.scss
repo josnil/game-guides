@@ -1,0 +1,70 @@
+// ------------------------------------------------------------
+// 自定义样式。
+// just-the-docs 的主题样式会在末尾引入本文件，所以主题升级时
+// 这里的内容不会被覆盖 —— 所有自定义样式都请写在本文件里。
+// 注意：本主题使用的 Sass 编译器版本较旧，不要用 @use 语法，
+// 直接写 CSS 即可（下面的 & 嵌套会被正常编译）。
+// ------------------------------------------------------------
+
+.vg-badge {
+  display: inline-block;
+  margin: 0 0 1rem 0;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+
+  &--ok {
+    color: #0b6b3a;
+    background-color: #e6f6ec;
+    border-color: #9bd9b4;
+  }
+
+  &--stale {
+    color: #8a1c1c;
+    background-color: #fdeaea;
+    border-color: #f0a9a9;
+  }
+}
+
+.vg-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 1.5rem 0;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e6e6e6;
+}
+
+.vg-chip {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid #e0e0e0;
+  background-color: #f2f2f2;
+  color: #3c3c3c;
+  font-size: 0.72rem;
+  line-height: 1.5;
+
+  &--tag {
+    color: #2a5db0;
+    background-color: #eef3fd;
+    border-color: #c7d8f5;
+  }
+
+  &--muted {
+    color: #6b6b6b;
+    background-color: transparent;
+    border-color: transparent;
+  }
+}
+
+.vg-stale-list {
+  margin-top: 1rem;
+
+  li {
+    margin-bottom: 0.5rem;
+  }
+}

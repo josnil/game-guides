@@ -1,0 +1,98 @@
+# ============================================================
+# 游戏攻略站 · Jekyll 4 配置
+# ------------------------------------------------------------
+# 重要：baseurl 绝对不要写在本文件里！
+#   GitHub Actions 会用 configure-pages 输出的 base_path，通过
+#   --baseurl 参数注入。所以「用户站点」和「项目站点」两种形态
+#   都不需要改这里，仓库形态切换只需要改下面的 url: 一行。
+# ============================================================
+
+title: 游戏名 攻略站
+description: 全版本 / BOSS / 玩法攻略，每篇标注适用游戏版本
+lang: zh-CN
+
+# 主题。版本锁在 Gemfile 里（just-the-docs 0.12.0），不要在这里写版本号。
+theme: just-the-docs
+
+# ------------------------------------------------------------
+# 仓库形态切换：只改这一行
+#   用户站点  <user>.github.io        ->  https://<user>.github.io
+#   项目站点  <user>.github.io/<repo> ->  https://<user>.github.io
+#   自定义域名                         ->  https://guide.example.com
+# 注意：url 只写到域名，不要带仓库路径（路径交给 --baseurl）。
+# ------------------------------------------------------------
+url: https://example.github.io
+
+# 插件。这里列出的插件必须同时出现在 Gemfile 的 :jekyll_plugins 组里，
+# 否则 Jekyll 会报 "could not be found"。
+plugins:
+  - jekyll-sitemap
+  - jekyll-seo-tag
+  - jekyll-include-cache
+
+# ------------------------------------------------------------
+# 攻略集合
+#   用 collection 而不是 _posts：_posts 的文件名必须带日期，而且
+#   未来日期的文件会被静默跳过（表现为「页面莫名消失」）；攻略按
+#   主题组织，不需要时间线语义。
+#   permalink 里的 :path 对应 _guides/ 下的目录层级，
+#   即 _guides/boss/xxx.md -> /guides/boss/xxx/
+# ------------------------------------------------------------
+collections:
+  guides:
+    output: true
+    permalink: /guides/:path/
+
+defaults:
+  - scope:
+      path: ""
+      type: guides
+    values:
+      layout: guide
+  - scope:
+      path: ""
+      type: pages
+    values:
+      layout: default
+
+# ------------------------------------------------------------
+# just-the-docs 主题配置
+# 把 guides 集合纳入侧栏导航与站内搜索（lunr 客户端搜索）
+# ------------------------------------------------------------
+just_the_docs:
+  collections:
+    guides:
+      name: 攻略
+
+search_enabled: true
+search:
+  heading_level: 2
+  previews: 3
+  rel_url: true
+  button: false
+
+heading_anchors: true
+nav_enabled: true
+color_scheme: light
+
+# 正文里用 {: .outdated } / {: .tip } 调用的提示框
+callouts:
+  outdated:
+    title: 该攻略可能已过期
+    color: red
+  tip:
+    title: 小技巧
+    color: green
+
+# 不参与构建的文件与目录
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+  - tools
+  - README.md
+  - package.json
+  - package-lock.json
+  - .github
+  - .gitignore

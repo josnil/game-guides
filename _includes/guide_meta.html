@@ -1,0 +1,23 @@
+{%- comment -%}
+攻略头部元信息：玩法 / 难度 / BOSS / 标签 / 最后更新。
+字段全部来自当前页面的 front matter，缺谁的就不显示谁；
+一个字段都没有时不渲染任何内容（分类索引页会走这个分支）。
+{%- endcomment -%}
+{%- assign has_meta = false -%}
+{%- if page.mode or page.difficulty or page.boss or page.last_modified_date -%}
+  {%- assign has_meta = true -%}
+{%- endif -%}
+{%- if page.tags and page.tags.size > 0 -%}
+  {%- assign has_meta = true -%}
+{%- endif -%}
+{%- if has_meta -%}
+<div class="vg-meta">
+  {%- if page.mode %}<span class="vg-chip">玩法：{{ page.mode }}</span>{% endif -%}
+  {%- if page.difficulty %}<span class="vg-chip">难度：{{ page.difficulty }}</span>{% endif -%}
+  {%- if page.boss %}<span class="vg-chip">BOSS：{{ page.boss }}</span>{% endif -%}
+  {%- for t in page.tags %}<span class="vg-chip vg-chip--tag">#{{ t }}</span>{% endfor -%}
+  {%- if page.last_modified_date -%}
+    <span class="vg-chip vg-chip--muted">最后更新：{{ page.last_modified_date | date: "%Y-%m-%d" }}</span>
+  {%- endif -%}
+</div>
+{%- endif -%}

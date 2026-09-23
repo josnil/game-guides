@@ -1,0 +1,13 @@
+{
+  "name": "game-guides-precheck",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "本地预检：在没有 Ruby/Jekyll 的环境下，尽量提前发现 front matter 与配置错误",
+  "scripts": {
+    "check": "node tools/precheck.mjs"
+  },
+  "devDependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}

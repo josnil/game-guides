@@ -1,0 +1,22 @@
+# Jekyll 构建产物
+_site/
+.jekyll-cache/
+.jekyll-metadata
+
+# Ruby / Bundler
+.bundle/
+vendor/
+
+# Node（仅用于本地预检脚本，不参与站点构建）
+node_modules/
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ------------------------------------------------------------
+# 注意：Gemfile.lock 必须提交，绝对不要加进本文件！
+# 它是「主题版本不漂移」的第二道保险。
+# ------------------------------------------------------------

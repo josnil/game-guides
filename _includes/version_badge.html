@@ -1,0 +1,24 @@
+{%- comment -%}
+版本徽章。用法：
+
+  {% include version_badge.html version=page.game_version %}
+
+判定逻辑：传入的版本号若不在 _data/versions.yml 的 supported 列表里，
+就显示红色的「可能已过期」提示，否则显示绿色徽章。
+没有传版本号时（例如分类索引页）不渲染任何内容。
+{%- endcomment -%}
+{%- assign v = include.version | default: page.game_version -%}
+{%- if v and v != "" -%}
+  {%- assign supported = site.data.versions.supported -%}
+  {%- assign meta = site.data.versions.history | where: "id", v | first -%}
+  {%- assign label = meta.name | default: v -%}
+  {%- if supported contains v -%}
+    {%- if meta.status == "current" -%}
+<span class="vg-badge vg-badge--ok">适用版本 {{ label }}（当前版本）</span>
+    {%- else -%}
+<span class="vg-badge vg-badge--ok">适用版本 {{ label }}</span>
+    {%- endif -%}
+  {%- else -%}
+<span class="vg-badge vg-badge--stale">该攻略基于 {{ label }}，可能已过期</span>
+  {%- endif -%}
+{%- endif -%}

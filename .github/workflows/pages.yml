@@ -1,0 +1,95 @@
+name: Build & Deploy Jekyll site
+
+# 触发规则：
+#   - push 到 main        -> 构建 + 部署
+#   - 任意 PR             -> 只构建校验（不部署）
+# 最后一条是本方案在没有本地 Ruby 时的核心补偿机制：
+# 改动先在 PR 里被 CI 验证，构建失败碰不到线上站点。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 缺 pages: write    -> 部署 403
+# 缺 id-token: write -> OIDC 报错
+# contents 要 write  -> 首次构建后自动提交 Gemfile.lock（见下面的步骤）
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      # 首次运行时仓库里还没有 Gemfile.lock（本机没装 Ruby，本地生成不了）。
+      # 这一步只把它打印到日志里，作为「下面自动提交那步失败时」的手动兜底，
+      # 正常情况下你不需要看它。
+      - name: Print resolved Gemfile.lock (fallback record)
+        run: |
+          if [ -f Gemfile.lock ]; then
+            echo "Gemfile.lock 已提交，跳过"
+          else
+            echo "::group::CI 解析出的 Gemfile.lock（仅在需要手动提交时复制这一段）"
+            cat Gemfile.lock
+            echo "::endgroup::"
+          fi
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      # --baseurl 由 configure-pages 注入，因此「用户站点」与
+      # 「项目站点」两种形态都不用改 _config.yml。
+      - name: Build with Jekyll
+        run: bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
+        env:
+          JEKYLL_ENV: production
+
+      - name: Upload artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
+
+      # 首次运行时仓库里还没有 Gemfile.lock（本机没有 Ruby，本地生成不了）。
+      # 下面这一步会自动把 CI 解析出的锁定版本提交回仓库 —— 你不需要做任何事。
+      # 用 GITHUB_TOKEN 推送的 commit 不会再次触发工作流，所以不会死循环。
+      # 若这步失败（例如仓库开了分支保护），站点部署不受影响（continue-on-error），
+      # 你可以改成手动：见 README 第五节。
+      - name: Commit Gemfile.lock on first run
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: |
+          if [ -f Gemfile.lock ]; then
+            echo "Gemfile.lock 已存在，无需提交"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Gemfile.lock
+          git commit -m "chore: 锁定依赖版本，写入 Gemfile.lock"
+          git push
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
