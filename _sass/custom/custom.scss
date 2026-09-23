@@ -1017,6 +1017,343 @@
   cursor: help;
 }
 
+// ============================================================
+// 9. 游戏数据（装备 / 技能 / 状态 / 宠物）
+// ============================================================
+
+// ---------- 9.1 图标（IconSet 雪碧图）----------
+// 2016 个图标共存在一张 512×4032 的图里，用 background-position 定位，
+// 所以不需要切 2016 个文件。每格 32×32。
+.gd-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  vertical-align: middle;
+  background-image: url("/assets/gamedata/iconset.png");
+  background-repeat: no-repeat;
+  // 图标本身是像素画，放大时保持硬边
+  image-rendering: pixelated;
+}
+
+// 需要更紧凑的位置（如浮窗、行内说明）用 24px，靠 background-size 等比缩小
+.gd-icon--sm {
+  width: 24px;
+  height: 24px;
+  background-size: 384px 3024px; // 512×0.75 , 4032×0.75
+}
+
+// 图标 + 文字的常见组合
+.gd-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+// ---------- 9.2 数据表 ----------
+// 分类之间的快捷导航
+.gd-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.2rem 0 1.4rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--wb-paper-300);
+}
+
+.gd-subnav__item {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--wb-paper-300);
+  border-radius: 999px;
+  background-color: rgba(255, 253, 248, 0.7);
+  color: var(--wb-text-muted);
+  font-size: 0.84rem;
+  text-decoration: none;
+  transition: color 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+
+  &:hover {
+    color: var(--wb-text-head);
+    border-color: var(--wb-gold-500);
+    background-color: #fdf7ea;
+  }
+
+  &.is-here {
+    color: var(--ink-950, #0b1219);
+    border-color: var(--wb-gold-500);
+    background-image: linear-gradient(180deg, var(--wb-gold-200), var(--wb-gold-500));
+    font-weight: 600;
+  }
+}
+
+.gd-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1.2rem 0 0.6rem;
+}
+
+.gd-toolbar input[type="search"] {
+  flex: 1 1 14rem;
+  min-width: 0;
+  max-width: 22rem;
+  min-height: 40px;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--wb-paper-300);
+  border-radius: 8px;
+  background-color: #fffdf8;
+  color: var(--wb-text-dark);
+  font-family: inherit;
+  font-size: 0.9rem;
+
+  &::placeholder {
+    color: var(--wb-text-muted);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--wb-gold-500);
+    box-shadow: 0 0 0 3px rgba(212, 160, 74, 0.18);
+  }
+}
+
+.gd-count {
+  color: var(--wb-text-muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.gd-empty {
+  margin: 0.8rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--wb-paper-300);
+  border-radius: 10px;
+  color: var(--wb-text-muted);
+  font-size: 0.88rem;
+}
+
+// 数据表：紧凑、可横向滚动，数字列右对齐
+.gd-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 2rem;
+}
+
+.gd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+
+  th,
+  td {
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid var(--wb-paper-300);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--wb-paper-200);
+    color: var(--wb-text-head);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  tbody tr:hover {
+    background-color: rgba(212, 160, 74, 0.08);
+  }
+
+  // 数字列：等宽对齐，扫起来快
+  .gd-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .gd-range {
+    color: var(--wb-text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .gd-tag {
+    display: inline-block;
+    margin: 0 0.25rem 0.15rem 0;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid var(--wb-paper-300);
+    background-color: var(--wb-paper-200);
+    color: var(--wb-text-muted);
+    font-size: 0.72rem;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+
+  .gd-tag--set {
+    border-color: #d9be86;
+    background-color: #fdf3dd;
+    color: #8a6218;
+  }
+
+  .gd-tag--wild {
+    border-color: #b7dbd6;
+    background-color: #e7f2f0;
+    color: #1c6a63;
+  }
+
+  .gd-tag--two {
+    border-color: #e0b6b0;
+    background-color: #fbeceb;
+    color: #8a332c;
+  }
+}
+
+// ---------- 9.3 套装卡片 ----------
+.gd-set {
+  margin: 1.6rem 0;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--wb-paper-300);
+  border-radius: 12px;
+  background-color: rgba(255, 253, 248, 0.72);
+}
+
+.gd-set__head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.gd-set__name {
+  margin: 0;
+  font-family: var(--wb-font-display);
+  font-size: 1.25rem;
+  color: var(--wb-text-head);
+}
+
+.gd-set__count {
+  color: var(--wb-text-muted);
+  font-size: 0.8rem;
+}
+
+.gd-set__bonuses {
+  margin: 0.7rem 0 0.9rem;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    gap: 0.55rem;
+    align-items: baseline;
+    padding: 0.25rem 0;
+    border-bottom: 1px dashed var(--wb-paper-300);
+    font-size: 0.88rem;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+}
+
+.gd-set__pieces {
+  flex: 0 0 auto;
+  min-width: 4.2rem;
+  color: #8a6218;
+  font-weight: 600;
+}
+
+.gd-set__members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.84rem;
+  }
+}
+
+// ---------- 9.4 宠物进化链 ----------
+.gd-chain {
+  margin: 1.4rem 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--wb-paper-300);
+  border-radius: 12px;
+  background-color: rgba(255, 253, 248, 0.72);
+}
+
+.gd-chain__title {
+  margin: 0 0 0.7rem;
+  font-family: var(--wb-font-display);
+  font-size: 1.15rem;
+  color: var(--wb-text-head);
+}
+
+.gd-chain__steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gd-pet {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--wb-paper-300);
+  border-radius: 10px;
+  background-color: #fffdf8;
+  text-decoration: none;
+  color: var(--wb-text-dark);
+
+  &:hover {
+    border-color: var(--wb-gold-500);
+    background-color: #fdf7ea;
+  }
+}
+
+.gd-chain__arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--wb-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.gd-chain__arrow::before {
+  content: "→";
+  font-size: 1rem;
+  color: var(--wb-gold-500);
+}
+
+.gd-kv {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.1rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.84rem;
+  color: var(--wb-text-muted);
+
+  b {
+    color: var(--wb-text-dark);
+    font-weight: 600;
+  }
+}
+
 // ---------- 8.3 侧边栏里的地图模块 ----------
 .wb-mod__count {
   margin-left: auto;

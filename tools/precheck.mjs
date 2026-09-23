@@ -513,6 +513,43 @@ if (maps && maps.world) {
   console.log(`  · 地图数据：${placeCount} 个地点，已核对 ${imgChecked} 个图片文件`);
 }
 
+// 游戏数据（装备/技能/状态/宠物）由 tools/build-gamedata.py 生成。
+// 页面里的图标与宠物头像是用变量拼出来的路径，链接检查器看不到，
+// 所以在这里单独核对文件是否真的存在 —— 生成器与产物最容易脱节的地方。
+const gdMeta = loadData("gamedata/meta.json");
+if (gdMeta) {
+  const iconRel = (gdMeta.icons && gdMeta.icons.file) || "";
+  if (iconRel) {
+    const p = path.join(ROOT, String(iconRel).replace(/^\//, ""));
+    if (!fs.existsSync(p)) {
+      E("_data/gamedata/meta.json",
+        `图标雪碧图不存在：${iconRel} —— 重新执行 python tools/build-gamedata.py`);
+    }
+  } else {
+    W("_data/gamedata/meta.json", "没有图标文件记录（可能是用 --no-icons 生成的）");
+  }
+  const gc = gdMeta.counts || {};
+  console.log(`  · 游戏数据：武器 ${gc.weapons} / 防具 ${gc.armors} / 套装 ${gc.sets} / ` +
+    `万能散搭 ${gc.wildcard} / 技能 ${gc.skills} / 状态 ${gc.states} / 宠物 ${gc.pets}`);
+}
+
+const petsData = loadData("gamedata/pets.json");
+if (petsData && Array.isArray(petsData.pets)) {
+  let missing = 0;
+  let checked = 0;
+  for (const p of petsData.pets) {
+    if (!p.sprite) continue;
+    checked++;
+    if (!fs.existsSync(path.join(ROOT, String(p.sprite).replace(/^\//, "")))) missing++;
+  }
+  if (missing > 0) {
+    E("_data/gamedata/pets.json",
+      `有 ${missing} / ${checked} 个宠物头像文件找不到 —— 重新执行 python tools/build-gamedata.py`);
+  } else {
+    console.log(`  · 宠物头像：已核对 ${checked} 个文件`);
+  }
+}
+
 // ============================================================
 // 7. 其他
 // ============================================================

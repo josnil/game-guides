@@ -1,0 +1,21 @@
+{%- comment -%}
+游戏图标（RPG Maker 的 IconSet 雪碧图）。
+  用法： {% include gd_icon.html idx=item.iconIndex %}
+         {% include gd_icon.html idx=1 label="死亡" %}
+
+  原理：IconSet 是 16 列 × N 行、每格 32×32 的雪碧图，
+        用 background-position 定位即可，不需要把 2016 个图标切成文件。
+  图标索引 0 表示「无图标」，此时不渲染任何东西。
+{%- endcomment -%}
+{%- assign gi = include.idx | default: 0 | plus: 0 -%}
+{%- if gi > 0 -%}
+  {%- assign gi_cols = site.data.gamedata.meta.icons.cols | default: 16 -%}
+  {%- assign gi_cell = site.data.gamedata.meta.icons.cell | default: 32 -%}
+  {%- assign gi_col = gi | modulo: gi_cols -%}
+  {%- assign gi_row = gi | divided_by: gi_cols -%}
+  {%- assign gi_x = gi_col | times: gi_cell -%}
+  {%- assign gi_y = gi_row | times: gi_cell -%}
+  <span class="gd-icon{% if include.small %} gd-icon--sm{% endif %}"
+        style="background-position: -{{ gi_x }}px -{{ gi_y }}px"
+        {% if include.label %}role="img" aria-label="{{ include.label }}"{% else %}aria-hidden="true"{% endif %}></span>
+{%- endif -%}

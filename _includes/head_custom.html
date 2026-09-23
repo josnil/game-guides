@@ -1,0 +1,6 @@
+{%- comment -%}
+主题预留的 <head> 注入点。
+这里挂上游戏数据页的表格筛选脚本（defer，不阻塞渲染）。
+没有表格的页面加载了也不会有任何副作用。
+{%- endcomment -%}
+<script src="{{ '/assets/js/gd-table.js' | relative_url }}" defer></script>

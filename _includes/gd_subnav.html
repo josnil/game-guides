@@ -1,0 +1,14 @@
+{%- comment -%}
+游戏数据各页之间的快捷导航。
+  用法： {% include gd_subnav.html active="weapons" %}
+{%- endcomment -%}
+{%- assign items = "weapons|武器,armors|防具,sets|套装,wildcard|万能散搭装,skills|技能,states|状态,pets|宠物" | split: "," -%}
+<nav class="gd-subnav" aria-label="游戏数据分类">
+  <a class="gd-subnav__item{% if include.active == nil or include.active == '' %} is-here{% endif %}"
+     href="{{ '/data/' | relative_url }}">总览</a>
+  {%- for it in items -%}
+    {%- assign parts = it | split: "|" -%}
+    <a class="gd-subnav__item{% if include.active == parts[0] %} is-here{% endif %}"
+       href="{{ '/data/' | append: parts[0] | append: '/' | relative_url }}">{{ parts[1] }}</a>
+  {%- endfor -%}
+</nav>

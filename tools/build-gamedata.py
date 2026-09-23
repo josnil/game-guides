@@ -1,0 +1,840 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+从《暗渊崛起》的游戏数据生成四大类结构化数据：装备 / 技能 / 状态 / 宠物。
+
+ ---------------------------------------------------------------------------
+ 用法：
+   python tools/build-gamedata.py                # 用默认游戏路径
+   python tools/build-gamedata.py --game "D:/其他/暗渊崛起"
+   python tools/build-gamedata.py --no-icons      # 跳过图标解密
+
+ 依赖：Pillow（图标压缩）。没装也能跑，只是图标会直接复制解密后的原图。
+       pip install Pillow
+
+ 读取（严格对应游戏目录结构）：
+   data/Weapons.json / Armors.json / Skills.json / States.json / Actors.json
+   data/Enemies.json          → 掉落来源
+   data/Items.json            → 宠物进化道具
+   data/Classes.json          → 宠物职业、职业限制
+   data/System.json           → 类型名、加密密钥
+   img/system/IconSet.png_    → 图标（RPGMV 格式加密，用密钥解密）
+   js/plugins.js              → 套装定义、宠物配置（注意 parameters 是字典）
+
+ 写入：
+   _data/gamedata/equipment.json   武器 / 防具 / 套装 / 万能散搭装
+   _data/gamedata/skills.json
+   _data/gamedata/states.json
+   _data/gamedata/pets.json
+   _data/gamedata/meta.json        类型表、统计、生成时间
+   assets/gamedata/iconset.png     解密并压缩后的图标雪碧图
+ ---------------------------------------------------------------------------
+"""
+
+import argparse
+import json
+import math
+import os
+import re
+import sys
+
+DEFAULT_GAME = r"D:\steam\steamapps\common\暗渊崛起"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# 八维基础属性（RPG Maker 顺序）
+PARAM_KEYS = ["mhp", "mmp", "atk", "def", "mat", "mdf", "agi", "luk"]
+PARAM_CN = ["最大HP", "最大MP", "攻击", "防御", "魔法攻击", "魔法防御", "敏捷", "幸运"]
+
+# 附加属性。顺序与 RPG Maker / VisuMZ 的索引一致，不能改顺序。
+XPARAM_CN = ["命中率", "闪避率", "暴击率", "暴击回避", "魔法回避",
+             "魔法反射", "反击率", "HP再生", "MP再生", "TP再生"]
+SPARAM_CN = ["被狙率", "防御率", "恢复率", "药物效果", "魔法消耗率",
+             "TP消耗率", "物理伤害率", "魔法伤害率", "地形伤害率", "经验获得率"]
+
+# 属性浮动与强化（读自 BZ_RandomEnhanceEquipment 的实际配置，下面会被真实值覆盖）
+FLOAT_PCT = 20.0
+ENHANCE_PCT = 20.0
+ENHANCE_MAX = 2
+
+ICON_CELL = 32
+ICON_COLS = 16
+
+
+def log(msg=""):
+    print(msg, flush=True)
+
+
+def read_json(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def write_json(path, obj):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(obj, f, ensure_ascii=False, separators=(",", ":"))
+        f.write("\n")
+
+
+def is_separator(name):
+    """数据库里的分类分隔项，如「-----上衣-重甲」"""
+    return bool(name) and name.startswith("-----")
+
+
+def note_tags(note):
+    """单行形式 <Tag: value> 与 <Tag> -> {tag: [values]}"""
+    out = {}
+    for m in re.finditer(r"<([^<>\n:]+?)\s*:\s*([^<>\n]*)>", note or ""):
+        out.setdefault(m.group(1).strip(), []).append(m.group(2).strip())
+    for m in re.finditer(r"<([^<>\n:]+?)>", note or ""):
+        out.setdefault(m.group(1).strip(), [])
+    return out
+
+
+def note_blocks(note, tag):
+    """多行块形式 <Tag> ... </Tag>"""
+    out = []
+    for m in re.finditer(r"<%s>([\s\S]*?)</%s>" % (re.escape(tag), re.escape(tag)), note or ""):
+        out.append(m.group(1).strip())
+    return out
+
+
+def note_get(note, tag, default=None):
+    """取第一个单行标签值"""
+    m = re.search(r"<%s\s*:\s*([^<>\n]*)>" % re.escape(tag), note or "")
+    return m.group(1).strip() if m else default
+
+
+def note_has(note, tag):
+    return re.search(r"<%s\s*[:>]" % re.escape(tag), note or "") is not None
+
+
+def parse_id_list(s):
+    return [int(x) for x in re.split(r"[|,，\s]+", s or "") if x.strip().isdigit()]
+
+
+def load_plugins(js_dir):
+    """plugins.js 是 `var $plugins = [...]`；parameters 是字典（不是数组）"""
+    txt = open(os.path.join(js_dir, "plugins.js"), "r", encoding="utf-8").read()
+    entries = json.loads(txt[txt.index("["):txt.rindex("]") + 1])
+    return {e.get("name"): e for e in entries}
+
+
+# ---------------------------------------------------------------------------
+def decrypt_rpgmv(path, key_hex):
+    """RPGMV 加密图片：16 字节签名（原样） + 接着 16 字节与密钥异或 + 其余原始数据"""
+    raw = open(path, "rb").read()
+    if raw[:5] != b"RPGMV":
+        return None
+    body = bytearray(raw[16:])
+    key = bytes.fromhex(key_hex)
+    for i in range(16):
+        body[i] ^= key[i]
+    return bytes(body)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--game", default=os.environ.get("AYJQ_GAME", DEFAULT_GAME))
+    ap.add_argument("--no-icons", action="store_true")
+    args = ap.parse_args()
+
+    game = args.game
+    data_dir = os.path.join(game, "data")
+    js_dir = os.path.join(game, "js")
+
+    log("=" * 74)
+    log("《暗渊崛起》游戏数据生成")
+    log("=" * 74)
+    log("游戏目录：" + game)
+    if not os.path.isdir(data_dir):
+        log("✗ 找不到 data 目录：" + data_dir)
+        return 1
+
+    global FLOAT_PCT, ENHANCE_PCT, ENHANCE_MAX
+
+    # ---------- 0. 基础表 ----------
+    system = read_json(os.path.join(data_dir, "System.json"))
+    types = {
+        "weaponTypes": system.get("weaponTypes") or [],
+        "armorTypes": system.get("armorTypes") or [],
+        "skillTypes": system.get("skillTypes") or [],
+        "elements": system.get("elements") or [],
+        "equipTypes": system.get("equipTypes") or [],
+    }
+
+    def tn(kind, idx):
+        arr = types.get(kind) or []
+        return arr[idx] if isinstance(idx, int) and 0 <= idx < len(arr) else ""
+
+    weapons_raw = read_json(os.path.join(data_dir, "Weapons.json"))
+    armors_raw = read_json(os.path.join(data_dir, "Armors.json"))
+    skills_raw = read_json(os.path.join(data_dir, "Skills.json"))
+    states_raw = read_json(os.path.join(data_dir, "States.json"))
+    actors_raw = read_json(os.path.join(data_dir, "Actors.json"))
+    classes_raw = read_json(os.path.join(data_dir, "Classes.json"))
+    enemies_raw = read_json(os.path.join(data_dir, "Enemies.json"))
+    items_raw = read_json(os.path.join(data_dir, "Items.json"))
+
+    classes = {c["id"]: c for c in classes_raw if c}
+    # 套装效果里会引用状态 ID，这里先建好索引（要在解析套装之前）
+    states_by_id = {s["id"]: s for s in states_raw if s}
+    log(f"基础表：武器 {len([x for x in weapons_raw if x])} / 防具 {len([x for x in armors_raw if x])} / "
+        f"技能 {len([x for x in skills_raw if x])} / 状态 {len([x for x in states_raw if x])} / "
+        f"角色 {len([x for x in actors_raw if x])} / 敌人 {len([x for x in enemies_raw if x])}")
+
+    # ---------- 1. 插件配置（真实取值）----------
+    plugins = load_plugins(js_dir)
+    par = (plugins.get("BZ_RandomEnhanceEquipment") or {}).get("parameters") or {}
+    if par:
+        try:
+            FLOAT_PCT = float(par.get("statFloatPercentage") or FLOAT_PCT)
+            ENHANCE_PCT = float(par.get("enhancePercentage") or ENHANCE_PCT)
+            e2 = float(par.get("enhance2Probability") or 0)
+            e1 = float(par.get("enhance1Probability") or 0)
+            ENHANCE_MAX = 2 if e2 > 0 else (1 if e1 > 0 else 0)
+            log(f"强化配置：属性浮动 ±{FLOAT_PCT:g}%  强化 +{ENHANCE_PCT:g}%/次  最多 {ENHANCE_MAX} 次")
+        except (TypeError, ValueError):
+            pass
+
+    enhance_mult = (1 + ENHANCE_PCT / 100.0) ** ENHANCE_MAX
+    log(f"⇒ 属性区间：下界 = 基础×{1 - FLOAT_PCT / 100:.2f}，"
+        f"上界 = 基础×{1 + FLOAT_PCT / 100:.2f}×{enhance_mult:.2f} = 基础×{(1 + FLOAT_PCT / 100) * enhance_mult:.3f}")
+
+    # ---------- 2. 掉落来源反查 ----------
+    drop_index = {}
+    for e in enemies_raw:
+        if not e:
+            continue
+        for d in e.get("dropItems") or []:
+            kind = d.get("kind")  # 1=item 2=weapon 3=armor
+            iid = d.get("dataId")
+            if not kind or not iid:
+                continue
+            den = float(d.get("denominator") or 0)
+            key = ("weapon" if kind == 2 else "armor" if kind == 3 else "item", iid)
+            drop_index.setdefault(key, []).append({
+                "enemyId": e["id"],
+                "enemy": e["name"],
+                # RPG Maker 的 denominator 是「1/N」里的 N，不是百分比本身。
+                # 早期版本直接当百分比输出，6 会变成 6%（实际是 1/6 ≈ 16.7%）。
+                "rate": round(100.0 / den, 2) if den else None,
+            })
+    log(f"掉落反查：{len(drop_index)} 种物品有敌人掉落记录")
+
+    # ---------- 3. 套装定义 ----------
+    set_defs = []
+    raw_sets = (plugins.get("VisuMZ_2_EquipSetBonuses") or {}).get("parameters", {}).get("EquipSets:arraystruct")
+    if raw_sets:
+        try:
+            for s in json.loads(raw_sets):
+                set_defs.append(json.loads(s))
+        except Exception as ex:
+            log(f"⚠ 套装定义解析失败：{ex}")
+    log(f"套装定义：{len(set_defs)} 套")
+
+    def parse_piece(struct_str):
+        """把 VisuMZ 的 PieceN 结构转成可读加成"""
+        if not struct_str:
+            return None
+        try:
+            o = json.loads(struct_str)
+        except Exception:
+            return None
+        if not o:
+            return None
+        out = {"text": None, "params": {}, "xparams": {}, "sparams": {},
+               "states": [], "skills": [], "other": {}}
+        t = o.get("Text:str")
+        if t and t != "auto":
+            out["text"] = t
+        ps = o.get("PassiveStates:arraynum")
+        if ps:
+            try:
+                for sid in json.loads(ps):
+                    sid = int(sid)
+                    st = states_by_id.get(sid)
+                    out["states"].append({
+                        "id": sid,
+                        "name": (st or {}).get("name") or ("状态 #%d" % sid),
+                        "iconIndex": (st or {}).get("iconIndex", 0),
+                    })
+            except Exception:
+                pass
+        # 八维属性
+        pm = o.get("Param:struct")
+        if pm:
+            try:
+                p = json.loads(pm)
+            except Exception:
+                p = {}
+            for i, cn in enumerate(PARAM_CN):
+                plus = p.get("Plus%d:num" % i)
+                rate = p.get("Rate%d:num" % i)
+                try:
+                    pv = float(str(plus).replace("+", "") or 0)
+                except ValueError:
+                    pv = 0
+                try:
+                    rv = float(rate or 1)
+                except ValueError:
+                    rv = 1
+                if pv or rv != 1:
+                    out["params"][PARAM_KEYS[i]] = {"plus": pv, "rate": rv, "cn": PARAM_CN[i]}
+        # XParam / SParam：结构是 {KEY: 说明, RateN:num, PlusN:num} 成对出现
+        for skey, table, dst in (("XParam:struct", XPARAM_CN, out["xparams"]),
+                                 ("SParam:struct", SPARAM_CN, out["sparams"])):
+            sv = o.get(skey)
+            if not sv:
+                continue
+            try:
+                sp = json.loads(sv)
+            except Exception:
+                continue
+            for i, cn in enumerate(table):
+                plus = sp.get("Plus%d:num" % i)
+                rate = sp.get("Rate%d:num" % i)
+                try:
+                    pv = float(str(plus).replace("+", "") or 0)
+                except ValueError:
+                    pv = 0
+                try:
+                    rv = float(rate or 1)
+                except ValueError:
+                    rv = 1
+                if pv or rv != 1:
+                    dst[str(i)] = {"plus": pv, "rate": rv, "cn": cn}
+        # 其它非空字段（技能等）原样留着，页面如实呈现
+        for k, v in o.items():
+            if k in ("Text:str", "ShowText:eval", "Bonuses", "PassiveStates:arraynum",
+                     "Param:struct", "XParam:struct", "SParam:struct"):
+                continue
+            if v and v not in ("[]", "{}", "''"):
+                out["other"][k] = v
+        if not (out["params"] or out["xparams"] or out["sparams"] or out["states"] or out["other"]):
+            return None
+
+        # 预先拼好可读文本。浮点格式化在 Liquid 里很别扭（附加属性的加成是 0.1 这种小数），
+        # 放在 Python 这边算完，页面只负责展示。
+        def fmt(v, fraction):
+            """fraction=True 表示加成是比例（0.1 → +10%）"""
+            s = v["cn"]
+            if v["plus"]:
+                if fraction:
+                    s += " +%g%%" % (v["plus"] * 100)
+                else:
+                    s += " +%g" % v["plus"]
+            if v["rate"] != 1:
+                s += " ×%g" % v["rate"]
+            return s
+
+        labels = []
+        for v in out["params"].values():
+            labels.append(fmt(v, False))
+        for v in out["xparams"].values():
+            labels.append(fmt(v, True))
+        for v in out["sparams"].values():
+            labels.append(fmt(v, True))
+        for st in out["states"]:
+            labels.append("状态：" + st["name"])
+        for k in out["other"]:
+            # 键名形如 "AddSkill:struct"，去掉类型后缀再展示
+            labels.append(re.sub(r":\w+$", "", k))
+        out["labels"] = labels
+        return out
+
+    sets = []
+    for sd in set_defs:
+        name = sd.get("SetName:str")
+        if not name:
+            continue
+        pieces = []
+        for i in range(1, 21):
+            pc = parse_piece(sd.get("Piece%d:struct" % i))
+            if pc:
+                pieces.append({"count": i, **pc})
+        sets.append({
+            "name": name,
+            "iconIndex": int(sd.get("Icon:num") or 0),
+            "pieces": pieces,
+            "members": [],
+        })
+    set_by_name = {s["name"]: s for s in sets}
+
+    # ---------- 4. 装备 ----------
+    def build_equip(item, kind):
+        if not item or is_separator(item.get("name")):
+            return None
+        note = item.get("note") or ""
+        params = item.get("params") or [0] * 8
+        rng = {}
+        for i, k in enumerate(PARAM_KEYS):
+            base = params[i] if i < len(params) else 0
+            if base == 0:
+                continue
+            # 装备属性有两重浮动：
+            #   1) 掉落时八维在 ±statFloatPercentage% 内随机（这一档只往下走，也可能往上）
+            #   2) 强化每次 +enhancePercentage%，最多 ENHANCE_MAX 次
+            # 取两个候选值的 min / max 作为「下界 / 上界」——
+            # 注意负属性（如敏捷 -8）不能直接拿 base×0.8 当下界，那样会算反。
+            a = base * (1 - FLOAT_PCT / 100.0)
+            b = base * (1 + FLOAT_PCT / 100.0) * enhance_mult
+            lo, hi = math.floor(min(a, b)), math.ceil(max(a, b))
+            rng[k] = {"base": base, "low": lo, "high": hi, "cn": PARAM_CN[i]}
+
+        out = {
+            "id": item["id"],
+            "kind": kind,
+            "name": item["name"],
+            "iconIndex": item.get("iconIndex", 0),
+            "desc": item.get("description") or "",
+            "price": item.get("price", 0),
+            "range": rng,
+            "dropFrom": drop_index.get((kind, item["id"]), []),
+            "set": note_get(note, "Equip Set"),
+            "wildcard": note_has(note, "Equip Set Wildcard"),
+            "wildcardSets": note_get(note, "Equip Set Wildcards"),
+            "twoHanded": note_has(note, "双手持"),
+            "reqRaw": (note_blocks(note, "Equip Requirements") or [None])[0],
+            "classOnly": note_get(note, "Equip For Classes Only"),
+            "traits": item.get("traits") or [],
+        }
+        if kind == "weapon":
+            out["wtypeId"] = item.get("wtypeId", 0)
+            out["wtype"] = tn("weaponTypes", item.get("wtypeId", 0))
+        else:
+            out["atypeId"] = item.get("atypeId", 0)
+            out["atype"] = tn("armorTypes", item.get("atypeId", 0))
+            out["etypeId"] = item.get("etypeId", 0)
+            out["etype"] = tn("equipTypes", item.get("etypeId", 0))
+        # 打造配方
+        ing = note_blocks(note, "Crafting Ingredients")
+        out["craft"] = ing[0] if ing else None
+        return out
+
+    weapons = [w for w in (build_equip(i, "weapon") for i in weapons_raw) if w]
+    armors = [a for a in (build_equip(i, "armor") for i in armors_raw) if a]
+    log(f"装备：武器 {len(weapons)} 件，防具 {len(armors)} 件")
+
+    # 套装成员
+    for it in weapons + armors:
+        if it["set"] and it["set"] in set_by_name:
+            set_by_name[it["set"]]["members"].append({
+                "id": it["id"], "kind": it["kind"], "name": it["name"], "iconIndex": it["iconIndex"],
+            })
+    matched = sum(len(s["members"]) for s in sets)
+    log(f"套装：{len(sets)} 套，已挂上 {matched} 件装备")
+    orphan = [s["name"] for s in sets if not s["members"]]
+    if orphan:
+        log(f"  ⚠ 没有装备归属于这些套装：{orphan}")
+
+    # 反向核对：装备上写的套装名，是否都有定义。
+    # 这是数据本身的不一致（游戏里改过名或删过套装），不是提取错误，
+    # 但要报出来，免得以为是脚本漏了。
+    used_names = set()
+    for it in weapons + armors:
+        if it["set"]:
+            used_names.add(it["set"])
+    undefined = sorted(used_names - set(set_by_name.keys()))
+    if undefined:
+        log(f"  ⚠ 有装备引用了未定义的套装名（游戏数据本身如此）：{undefined}")
+    # 只被分隔条目引用的套装（分隔条目不作为装备收录）
+    sep_only = []
+    for s in sets:
+        if s["members"]:
+            continue
+        owners = []
+        for raw, kind in ((weapons_raw, "weapon"), (armors_raw, "armor")):
+            for i in raw:
+                if not i or not is_separator(i.get("name")):
+                    continue
+                if note_get(i.get("note") or "", "Equip Set") == s["name"]:
+                    owners.append(i["name"])
+        if owners:
+            sep_only.append((s["name"], owners))
+    for nm, owners in sep_only:
+        log(f"  · 「{nm}」的引用者只有分隔条目 {owners}，因此没有实际成员")
+
+    wildcard = [it for it in weapons + armors if it["wildcard"]]
+    log(f"万能散搭装（<Equip Set Wildcard>）：{len(wildcard)} 件")
+
+    # ---------- 5. 技能 ----------
+    skills = []
+    for s in skills_raw:
+        if not s or is_separator(s.get("name")):
+            continue
+        note = s.get("note") or ""
+        dmg = s.get("damage") or {}
+        w1 = s.get("requiredWtypeId1", 0)
+        w2 = s.get("requiredWtypeId2", 0)
+        wt = [tn("weaponTypes", x) for x in (w1, w2) if x]
+        skills.append({
+            "id": s["id"],
+            "name": s["name"],
+            "iconIndex": s.get("iconIndex", 0),
+            "stypeId": s.get("stypeId", 0),
+            "stype": tn("skillTypes", s.get("stypeId", 0)),
+            "desc": s.get("description") or "",
+            "mpCost": s.get("mpCost", 0),
+            "tpCost": s.get("tpCost", 0),
+            "formula": dmg.get("formula") or "",
+            "damageType": dmg.get("type"),
+            "variance": dmg.get("variance"),
+            "critical": bool(dmg.get("critical")),
+            "elementId": dmg.get("elementId", -1),
+            "element": tn("elements", dmg.get("elementId", -1)) if dmg.get("elementId", -1) >= 0 else "",
+            "repeats": s.get("repeats", 1),
+            "scope": s.get("scope"),
+            "occasion": s.get("occasion"),
+            "weaponSkill": bool(w1 or w2),
+            "weaponTypes": wt,
+            "effects": s.get("effects") or [],
+            "note": note,
+        })
+    log(f"技能：{len(skills)} 条（其中武器技能 {sum(1 for x in skills if x['weaponSkill'])} 条）")
+
+    # ---------- 6. 状态 ----------
+    states = []
+    for s in states_raw:
+        if not s or is_separator(s.get("name")):
+            continue
+        note = s.get("note") or ""
+        desc = s.get("description")
+        if not desc:
+            desc = note_get(note, "Description", "")
+        states.append({
+            "id": s["id"],
+            "name": s["name"],
+            "iconIndex": s.get("iconIndex", 0),
+            "desc": desc or "",
+            "note": note,
+        })
+    log(f"状态：{len(states)} 条")
+
+    # ---------- 7. 宠物 ----------
+    skills_by_id = {x["id"]: x for x in skills}
+    pet_params = (plugins.get("BZ_PetSystem") or {}).get("parameters") or {}
+    pet_cfg = {}
+    if pet_params.get("petData"):
+        try:
+            for s in json.loads(pet_params["petData"]):
+                o = json.loads(s)
+                pet_cfg[int(o["actorId"])] = o
+        except Exception as ex:
+            log(f"⚠ 宠物配置解析失败：{ex}")
+    skill_groups = {}
+    if pet_params.get("skillGroups"):
+        try:
+            for s in json.loads(pet_params["skillGroups"]):
+                o = json.loads(s)
+                skill_groups[o.get("groupName")] = o
+        except Exception as ex:
+            log(f"⚠ 技能组解析失败：{ex}")
+    log(f"宠物配置：{len(pet_cfg)} 条，技能组 {len(skill_groups)} 组")
+
+    def skills_of(raw_list):
+        out = []
+        if not raw_list:
+            return out
+        try:
+            for s in json.loads(raw_list):
+                o = json.loads(s)
+                sid = int(o.get("skillId") or 0)
+                if sid > 0:
+                    sk = skills_by_id.get(sid) or {}
+                    out.append({"skillId": sid, "probability": int(o.get("probability") or 0),
+                                "name": sk.get("name") or ("技能 #%d" % sid),
+                                "iconIndex": sk.get("iconIndex", 0),
+                                "stype": sk.get("stype", "")})
+        except Exception:
+            pass
+        return out
+
+    def group_names(raw_list):
+        out = []
+        if not raw_list:
+            return out
+        try:
+            for s in json.loads(raw_list):
+                n = json.loads(s).get("groupName")
+                if n:
+                    out.append(n)
+        except Exception:
+            pass
+        return out
+
+    # 进化：道具上的 <PetEvolve: from, to> + <RequireLevel: N>
+    evolutions = []
+    for it in items_raw:
+        if not it:
+            continue
+        note = it.get("note") or ""
+        m = re.search(r"<PetEvolve\s*[:：]\s*([\d|,，\s]+?)\s*,\s*(\d+)\s*>", note, re.I)
+        if not m:
+            continue
+        evolutions.append({
+            "itemId": it["id"],
+            "itemName": it["name"],
+            "itemIconIndex": it.get("iconIndex", 0),
+            "fromIds": parse_id_list(m.group(1)),
+            "toId": int(m.group(2)),
+            "requireLevel": int(note_get(note, "RequireLevel", 0) or 0),
+            "assistIds": parse_id_list(note_get(note, "PetUnionEvolve", "") or "")
+            + parse_id_list(note_get(note, "PetJointEvolve", "") or ""),
+            "itemDesc": it.get("description") or "",
+        })
+    log(f"进化道具：{len(evolutions)} 条")
+
+    actors = {a["id"]: a for a in actors_raw if a}
+    pets = []
+    for a in actors_raw:
+        if not a or not (a.get("note") or "").find("<MKPet>") >= 0:
+            continue
+        note = a["note"]
+        cfg = pet_cfg.get(a["id"], {})
+        cls = classes.get(a.get("classId"))
+        growth = {}
+        gm = note_get(note, "PetParamGrowth")
+        if gm:
+            for kv in gm.split(","):
+                if "=" in kv:
+                    k, v = kv.split("=", 1)
+                    k = k.strip().lower()
+                    if k in PARAM_KEYS:
+                        try:
+                            growth[k] = {"value": float(v.strip()), "cn": PARAM_CN[PARAM_KEYS.index(k)]}
+                        except ValueError:
+                            pass
+        # 这一只的进化去向 / 来源
+        to_evos = [e for e in evolutions if a["id"] in e["fromIds"]]
+        from_evos = [e for e in evolutions if e["toId"] == a["id"]]
+        pets.append({
+            "id": a["id"],
+            "name": a["name"],
+            "profile": a.get("profile") or "",
+            "classId": a.get("classId"),
+            "className": (cls or {}).get("name"),
+            "maxLevel": a.get("maxLevel"),
+            "growth": growth,
+            "demonicArmor": parse_id_list(note_get(note, "DemonicArmor", "") or ""),
+            "demonicWeapon": parse_id_list(note_get(note, "DemonicWeapon", "") or ""),
+            "captureFrom": {
+                "enemyId": int(cfg["enemyId"]) if cfg.get("enemyId") else None,
+                "enemy": (enemies_raw[int(cfg["enemyId"])]["name"]
+                          if cfg.get("enemyId") and int(cfg["enemyId"]) < len(enemies_raw)
+                          and enemies_raw[int(cfg["enemyId"])] else None),
+                "difficulty": int(cfg.get("captureDifficulty") or 0) if cfg.get("captureDifficulty") else None,
+            },
+            "mutationSkills": skills_of(cfg.get("mutationSkills")),
+            "demonicSkills": skills_of(cfg.get("demonicSkills")),
+            "demonicExclusiveSkillId": int(cfg.get("demonicExclusiveSkillId") or 0),
+            "demonicExclusiveSkill": (lambda sid: ({"skillId": sid, "name": (skills_by_id.get(sid) or {}).get("name") or ("技能 #%d" % sid), "iconIndex": (skills_by_id.get(sid) or {}).get("iconIndex", 0), "stype": (skills_by_id.get(sid) or {}).get("stype", "")}) if sid > 0 else None)(int(cfg.get("demonicExclusiveSkillId") or 0)),
+            "skillGroups": group_names(cfg.get("skillGroups")),
+            "mutationGroups": group_names(cfg.get("mutationGroups")),
+            "demonicGroups": group_names(cfg.get("demonicGroups")),
+            "evolvesTo": [{"toId": e["toId"], "item": e["itemName"], "itemId": e["itemId"],
+                           "requireLevel": e["requireLevel"], "assistIds": e["assistIds"]} for e in to_evos],
+            "evolvesFrom": [{"fromId": f, "item": e["itemName"], "itemId": e["itemId"],
+                             "requireLevel": e["requireLevel"]} for e in from_evos for f in e["fromIds"]],
+        })
+    log(f"宠物：{len(pets)} 只（其中 {sum(1 for p in pets if p['evolvesTo'])} 只有进化去向）")
+
+    # ---------- 7.5 宠物图像 ----------
+    # 宠物是「角色」不是「物品」，所以没有 iconIndex 可用。
+    # 它们的形象在 img/characters 的行走图里（同样是 RPGMV 加密）：
+    #   文件名以 $ 开头 → 整张图只有 1 个角色，3 列 × 4 行
+    #   否则            → 4 列 × 2 行，共 8 个角色，由 characterIndex 选择
+    # 每格 48×48。这里取「左下角那帧」（面朝下的站立姿势）作为头像。
+    CHAR_CELL = 48
+    key_hex = system.get("encryptionKey")
+    char_dir = os.path.join(game, "img", "characters")
+    pet_img_dir = os.path.join(REPO, "assets", "gamedata", "pets")
+    n_img = 0
+    if key_hex and os.path.isdir(char_dir) and not args.no_icons:
+        try:
+            from PIL import Image
+            import io
+            os.makedirs(pet_img_dir, exist_ok=True)
+            for f in os.listdir(pet_img_dir):  # 清掉旧图，避免改名后残留
+                if f.endswith(".png"):
+                    os.remove(os.path.join(pet_img_dir, f))
+            for p in pets:
+                a = actors.get(p["id"]) or {}
+                cn = a.get("characterName")
+                ci = a.get("characterIndex") or 0
+                if not cn:
+                    continue
+                src = os.path.join(char_dir, cn + ".png_")
+                if not os.path.exists(src):
+                    continue
+                png = decrypt_rpgmv(src, key_hex)
+                if not png or png[:8] != b"\x89PNG\r\n\x1a\n":
+                    continue
+                im = Image.open(io.BytesIO(png)).convert("RGBA")
+                W, H = im.size
+                if cn.startswith("$"):
+                    cols, rows = W // CHAR_CELL, H // CHAR_CELL
+                    col, row = 0, min(rows - 1, 2)  # 第 3 行 = 朝下站立
+                else:
+                    cols, rows = W // CHAR_CELL, H // CHAR_CELL
+                    col = ci % 4
+                    row = min(rows - 1, 1 + (ci // 4) * 2 + 1)  # 每个角色占 2 行，取下半
+                    row = min(row, rows - 1)
+                if cols < 1 or rows < 1:
+                    continue
+                box = (col * CHAR_CELL, row * CHAR_CELL, (col + 1) * CHAR_CELL, (row + 1) * CHAR_CELL)
+                frame = im.crop(box)
+                out = os.path.join(pet_img_dir, "%d.png" % p["id"])
+                frame.save(out, "PNG", optimize=True)
+                p["sprite"] = "/assets/gamedata/pets/%d.png" % p["id"]
+                n_img += 1
+            total = sum(os.path.getsize(os.path.join(pet_img_dir, f))
+                        for f in os.listdir(pet_img_dir)) if os.path.isdir(pet_img_dir) else 0
+            log(f"宠物图像：{n_img} / {len(pets)} 只取到行走图，合计 {total / 1024:.0f}KB")
+        except ImportError:
+            log("宠物图像：没装 Pillow，跳过")
+
+    # ---------- 7.6 进化链 ----------
+    # 从「只作为起点、不作为终点」的宠物出发，沿 evolvesTo 走成链。
+    # 多对一的进化（如 17|22|23 → 18）会自然分出多条链路，这符合实际玩法。
+    pets_by_id = {p["id"]: p for p in pets}
+    to_ids = {e["toId"] for e in evolutions}
+    edges = {}
+    for e in evolutions:
+        for f in e["fromIds"]:
+            if f in pets_by_id:
+                edges.setdefault(f, []).append(e)
+
+    def step_of(pid, edge=None):
+        p = pets_by_id.get(pid)
+        if not p:
+            return None
+        s = {"petId": pid, "name": p["name"], "className": p["className"],
+             "sprite": p.get("sprite"), "profile": p["profile"]}
+        if edge:
+            s["itemId"] = edge["itemId"]
+            s["itemName"] = edge["itemName"]
+            s["itemIconIndex"] = edge["itemIconIndex"]
+            s["requireLevel"] = edge["requireLevel"]
+            s["assistIds"] = [i for i in edge["assistIds"] if i in pets_by_id]
+            s["assistNames"] = [pets_by_id[i]["name"] for i in s["assistIds"]]
+        return s
+
+    chains = []
+    seen = set()
+
+    def walk(pid, steps, depth):
+        if depth > 6:
+            return
+        outs = edges.get(pid) or []
+        if not outs:
+            if len(steps) > 1:
+                key = tuple(x["petId"] for x in steps)
+                if key not in seen:
+                    seen.add(key)
+                    chains.append({"steps": list(steps)})
+            return
+        for e in outs:
+            nxt = step_of(e["toId"], e)
+            if nxt:
+                walk(e["toId"], steps + [nxt], depth + 1)
+
+    for p in pets:
+        if p["id"] not in to_ids and p["id"] in edges:
+            walk(p["id"], [step_of(p["id"])], 0)
+
+    # 一条链都没参与的宠物（没有进化关系）
+    in_chain = set()
+    for c in chains:
+        for s in c["steps"]:
+            in_chain.add(s["petId"])
+    standalone = [p["id"] for p in pets if p["id"] not in in_chain]
+    chains.sort(key=lambda c: (-len(c["steps"]), c["steps"][0]["name"]))
+    log(f"进化链：{len(chains)} 条（最长 {max((len(c['steps']) for c in chains), default=0)} 级），"
+        f"未参与进化的宠物 {len(standalone)} 只")
+
+    # ---------- 8. 图标 ----------
+    icon_meta = {"cell": ICON_CELL, "cols": ICON_COLS, "file": None, "count": 0}
+    if not args.no_icons:
+        src = os.path.join(game, "img", "system", "IconSet.png_")
+        key_hex = system.get("encryptionKey")
+        dst_dir = os.path.join(REPO, "assets", "gamedata")
+        os.makedirs(dst_dir, exist_ok=True)
+        dst = os.path.join(dst_dir, "iconset.png")
+        if os.path.exists(src) and key_hex:
+            png = decrypt_rpgmv(src, key_hex)
+            if png and png[:8] == b"\x89PNG\r\n\x1a\n":
+                w = int.from_bytes(png[16:20], "big")
+                h = int.from_bytes(png[20:24], "big")
+                icon_meta.update({"cols": w // ICON_CELL, "rows": h // ICON_CELL,
+                                  "count": (w // ICON_CELL) * (h // ICON_CELL),
+                                  "file": "/assets/gamedata/iconset.png"})
+                try:
+                    from PIL import Image
+                    import io
+                    im = Image.open(io.BytesIO(png)).convert("RGBA")
+                    # 图标雪碧图有 80 多万种颜色（抗锯齿/渐变），RGBA 直存要 4MB。
+                    # 量化到 256 色后约 1MB，32×32 的小图标看不出差别 —— 而这文件
+                    # 只要展示图标就会加载一次，体积值得优化。
+                    im.convert("RGB").quantize(colors=256, method=Image.MEDIANCUT,
+                                               dither=Image.NONE).save(dst, "PNG", optimize=True)
+                    log(f"图标：{w}x{h}，{icon_meta['count']} 个（{w // ICON_CELL} 列 × {h // ICON_CELL} 行）"
+                        f"  解密 {len(png) / 1048576:.2f}MB → 量化 256 色 {os.path.getsize(dst) / 1048576:.2f}MB")
+                except ImportError:
+                    open(dst, "wb").write(png)
+                    log(f"图标：{w}x{h}（没装 Pillow，直接写原图 {len(png) / 1048576:.2f}MB）")
+            else:
+                log("⚠ 图标解密失败（PNG 头不对）")
+        else:
+            log("⚠ 找不到 IconSet.png_ 或 encryptionKey")
+    else:
+        log("图标：已跳过（--no-icons）")
+
+    # ---------- 9. 输出 ----------
+    meta = {
+        "types": types,
+        "paramKeys": PARAM_KEYS,
+        "paramCn": PARAM_CN,
+        "floatPct": FLOAT_PCT,
+        "enhancePct": ENHANCE_PCT,
+        "enhanceMax": ENHANCE_MAX,
+        # 区间倍率直接算好写进数据，页面就不必在 Liquid 里做浮点运算
+        "rangeFormula": {
+            "lowMul": round(1 - FLOAT_PCT / 100.0, 3),
+            "enhanceMul": round(enhance_mult, 3),
+            "highMul": round((1 + FLOAT_PCT / 100.0) * enhance_mult, 3),
+        },
+        "icons": icon_meta,
+        "counts": {
+            "weapons": len(weapons), "armors": len(armors), "sets": len(sets),
+            "wildcard": len(wildcard), "skills": len(skills),
+            "states": len(states), "pets": len(pets), "evolutions": len(evolutions),
+            "skillGroups": len(skill_groups),
+        },
+    }
+
+    gd = os.path.join(REPO, "_data", "gamedata")
+    write_json(os.path.join(gd, "equipment.json"),
+               {"weapons": weapons, "armors": armors, "sets": sets, "wildcard": wildcard,
+                # 装备引用了、但套装定义里没有的名字。页面直接读这个字段，
+                # 不必在 Liquid 里做集合差集（那样又绕又容易算错）。
+                "undefinedSets": undefined})
+    write_json(os.path.join(gd, "skills.json"), skills)
+    write_json(os.path.join(gd, "states.json"), states)
+    write_json(os.path.join(gd, "pets.json"),
+               {"pets": pets, "evolutions": evolutions, "skillGroups": skill_groups,
+                "chains": chains, "standalone": standalone})
+    write_json(os.path.join(gd, "meta.json"), meta)
+
+    log("")
+    log("已写 _data/gamedata/：equipment / skills / states / pets / meta")
+    for name in ("equipment", "skills", "states", "pets", "meta"):
+        p = os.path.join(gd, name + ".json")
+        log(f"    {name}.json  {os.path.getsize(p) / 1024:.0f}KB")
+    log("")
+    log("完成。接下来：npm run check && npm run publish")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

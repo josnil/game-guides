@@ -8,6 +8,7 @@
     "check": "node tools/precheck.mjs",
     "test": "python tools/test-overrides.py",
     "maps": "python tools/build-maps.py",
+    "gamedata": "python tools/build-gamedata.py",
     "publish": "node tools/publish.mjs",
     "publish:dry": "node tools/publish.mjs --dry-run"
   },

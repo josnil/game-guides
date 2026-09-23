@@ -1,0 +1,13 @@
+{%- comment -%}
+属性区间渲染。
+  用法： {% include gd_range.html range=item.range %}
+  输入： { "atk": {"base":25,"low":20,"high":44,"cn":"攻击"}, ... }
+  输出： 攻击 20~44 · 防御 8~18
+  上下界相等时只显示一个数，避免「20~20」这种噪音。
+{%- endcomment -%}
+{%- for pair in include.range -%}
+  {%- assign v = pair[1] -%}
+  <span class="gd-tag">{{ v.cn }}
+    {%- if v.low == v.high %} {{ v.low }}{% else %} {{ v.low }}~{{ v.high }}{% endif -%}
+  </span>
+{%- endfor -%}
