@@ -269,19 +269,25 @@ def main():
     log(f"  已写 _data/map_events.json（{len(events_by_map)} 张图，共 {total_marks} 个事件位置）")
 
     # ---------- 8. 各地点页面 ----------
+    # 页面里的图片宽高来自上一步的压缩结果，所以 --no-images 模式下不碰页面文件
+    # （早期版本在这个模式里会先把页面删掉、又写不出来，等于把页面清空了）。
     map_dir = os.path.join(REPO, "map")
-    os.makedirs(map_dir, exist_ok=True)
-    for f in os.listdir(map_dir):
-        if f.endswith(".md"):
-            os.remove(os.path.join(map_dir, f))
+    if args.no_images:
+        log("  --no-images：跳过 map/*.md（只更新数据文件）")
+        written = 0
+    else:
+        os.makedirs(map_dir, exist_ok=True)
+        for f in os.listdir(map_dir):
+            if f.endswith(".md"):
+                os.remove(os.path.join(map_dir, f))
 
-    written = 0
-    for p in places:
-        mid = p["mapId"]
-        if mid is None or "image" not in p:
-            continue
-        cnt = len(events_by_map.get(str(mid), []))
-        body = f"""---
+        written = 0
+        for p in places:
+            mid = p["mapId"]
+            if mid is None or "image" not in p:
+                continue
+            cnt = len(events_by_map.get(str(mid), []))
+            body = f"""---
 title: {p["title"]}
 layout: default
 permalink: /map/{mid}/
@@ -296,14 +302,14 @@ map_exits: {p["exits"]}
 
 # {p["title"]}
 
-{{% include wb_map_view.html map_id="{(mid)}" src=p.map_src alt=p.map_title w=p.map_w h=p.map_h count=p.map_events exits=p.map_exits %}}
+{{% include wb_map_view.html map_id="{mid}" src=page.map_src alt=page.map_title w=page.map_w h=page.map_h count=page.map_events exits=page.map_exits %}}
 
 <p class="wb-map__back"><a href="{{{{ '/map/' | relative_url }}}}">← 返回世界大地图</a></p>
 """
-        with open(os.path.join(map_dir, f"{mid}.md"), "w", encoding="utf-8", newline="\n") as f:
-            f.write(body)
-        written += 1
-    log(f"  已写 map/*.md（{written} 个地点页面）")
+            with open(os.path.join(map_dir, f"{mid}.md"), "w", encoding="utf-8", newline="\n") as f:
+                f.write(body)
+            written += 1
+        log(f"  已写 map/*.md（{written} 个地点页面）")
 
     # ---------- 9. 统计 ----------
     if not args.no_images:
