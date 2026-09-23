@@ -281,8 +281,17 @@ Generating... /guides/boss/shadow-tree/
 如果你以后用本地 `git push`，先执行一次 `git pull` 再推，否则会被拒绝。
 （用网页上传的人不会遇到这个问题。）
 
-**如果自动提交失败**（比如仓库开了分支保护）：这一步设了 `continue-on-error`，
-**构建和部署都不会受影响**，站点照常上线。你想手动补的话：
+**前提：仓库要允许工作流写入**（这一步很容易漏，漏了自动提交会静默失败）
+
+新仓库的默认设置是**只读**，即使工作流里写了 `contents: write` 也无法提权，`git push` 会失败。
+去开一下（只需一次）：
+
+> 仓库 → **Settings** → 左侧 **Actions** → **General** → 拉到最下面
+> **Workflow permissions** → 选 **Read and write permissions** → **保存**
+> 成功后页面顶部会显示 `Default workflow permissions settings saved.`
+
+**如果还是失败了**（比如仓库开了分支保护）：工作流会在 Actions 里打出黄色警告，
+**构建和部署都不受影响**，站点照常上线。你想手动补的话：
 
 1. Actions → 那次运行 → **build** job → 展开 **Print resolved Gemfile.lock (fallback record)**
 2. 复制展开区域里的全部内容
