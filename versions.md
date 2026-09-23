@@ -2,6 +2,9 @@
 title: 按版本查攻略
 layout: default
 nav_order: 20
+
+# 根目录的 .md 页面默认会生成 /versions.html；写死 permalink 才能得到干净的 /versions/
+permalink: /versions/
 ---
 
 # 按版本查攻略

@@ -325,7 +325,89 @@ for (const { file, parent } of pendingParents) {
 }
 
 // ============================================================
-// 6. 其他
+// 6. 链接检查
+// ------------------------------------------------------------
+// 这一节是为了拦住一类真实踩过的坑：正文里写 {{ '/outdated/' | relative_url }}，
+// 但 Jekyll 对根目录的 .md 页面默认生成 /outdated.html，两者不匹配 → 线上 404。
+// ============================================================
+const knownUrls = new Set();
+
+// 6.1 根目录的页面（index.md / outdated.md / versions.md …）
+for (const p of walk(ROOT)) {
+  if (path.dirname(p) !== ROOT) continue;
+  if (!p.endsWith(".md") || p.endsWith("README.md")) continue;
+  const f = rel(p);
+  const fm = splitFrontMatter(read(p));
+  let data = {};
+  if (fm && yaml) {
+    try {
+      data = yaml.load(fm.raw) || {};
+    } catch {
+      data = {};
+    }
+  }
+  const base = path.basename(p, ".md");
+  if (data.permalink) {
+    knownUrls.add(String(data.permalink));
+  } else if (base === "index") {
+    knownUrls.add("/");
+  } else {
+    knownUrls.add(`/${base}.html`);
+    W(f, `没有写 permalink，这一页的网址会是 /${base}.html（带 .html 后缀）。如果正文里其他地方用 /${base}/ 链接它就会 404 —— 建议加 permalink: /${base}/`);
+  }
+}
+
+// 6.2 攻略集合生成的 URL
+for (const g of guides) {
+  const relFromGuides = path.relative(GUIDES_DIR, g.path).split(path.sep).join("/");
+  if (g.isIndex) {
+    const dir = path.dirname(relFromGuides);
+    knownUrls.add(dir === "." ? "/guides/" : `/guides/${dir}/`);
+  } else {
+    knownUrls.add(`/guides/${relFromGuides.replace(/\.md$/, "")}/`);
+  }
+}
+
+// 6.3 收集所有 relative_url 引用并逐个核对
+// 注意两件事：
+//   1) README.md 不参与构建（_config.yml 里 exclude 了），它里面的写法都是示例，不能当真实引用
+//   2) HTML 注释里的引用也是示例（Jekyll 仍然会渲染它，但不指向真实文件），要剔除
+const LINK_RE = /\{\{-?\s*['"](\/[^'"]*)['"]\s*\|\s*relative_url\s*-?\}\}/g;
+const stripComments = (s) => s.replace(/<!--[\s\S]*?-->/g, "");
+
+const linkSources = [
+  ...guideFiles,
+  ...walk(ROOT).filter(
+    (x) => path.dirname(x) === ROOT && x.endsWith(".md") && !x.endsWith("README.md")
+  ),
+];
+
+let linkCount = 0;
+for (const p of linkSources) {
+  const f = rel(p);
+  const src = stripComments(read(p));
+  let m;
+  LINK_RE.lastIndex = 0;
+  while ((m = LINK_RE.exec(src)) !== null) {
+    linkCount++;
+    const target = m[1];
+    if (target.startsWith("/assets/") || target.startsWith("/tools/")) {
+      // 静态文件：核对磁盘上是否存在
+      const local = path.join(ROOT, target.replace(/^\//, ""));
+      if (!fs.existsSync(local)) E(f, `引用了不存在的静态文件：${target}`);
+      continue;
+    }
+    if (!knownUrls.has(target)) {
+      const hint = knownUrls.has(target.replace(/\/$/, ".html"))
+        ? `（写成 ${target.replace(/\/$/, ".html")} 才是对的）`
+        : "";
+      E(f, `链接目标 ${target} 在站点里不存在 —— 生成后会是 404 ${hint}`);
+    }
+  }
+}
+
+// ============================================================
+// 7. 其他
 // ============================================================
 if (fs.existsSync(path.join(ROOT, "CNAME"))) {
   W("CNAME", "仓库里存在 CNAME 文件。官方文档明确：它不会自动添加或移除自定义域名，必须去 Settings → Pages 里配置");

@@ -2,6 +2,9 @@
 title: 待复核清单
 layout: default
 nav_order: 30
+
+# 根目录的 .md 页面默认会生成 /outdated.html；写死 permalink 才能得到干净的 /outdated/
+permalink: /outdated/
 ---
 
 {%- assign supported = site.data.versions.supported -%}
