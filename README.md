@@ -163,6 +163,43 @@ npm run check
 
 规律：攻略的网址就是 `_guides/` 下的目录层级，`_guides/boss/shadow-tree.md` → `/guides/boss/shadow-tree/`。
 
+### 一键发布：`npm run publish`
+
+不想记上面那串命令的话，用这一个：
+
+```bash
+npm run publish                                  # 自动生成提交信息
+npm run publish -- -m "改了幽影树攻略"            # 自己写提交信息
+npm run publish -- --dry-run                     # 干跑：只预检，不提交不推送
+npm run publish -- --no-watch                    # 推完就结束，不跟踪构建
+```
+
+它按顺序做五件事：
+
+| 步骤 | 做什么 | 失败会怎样 |
+| --- | --- | --- |
+| 0 | 检查是否在 git 仓库、列出改动文件 | 不是 git 仓库就停 |
+| 1 | 跑 `tools/precheck.mjs` | **预检不通过直接中止，不会推坏内容上去** |
+| 2 | `git add -A` + `git commit` | — |
+| 3 | `git pull --rebase`（关键！） | 冲突时提示你手动解决后再跑一次 |
+| 4 | `git push` | — |
+| 5 | 查询构建结果，成功就打印站点地址 | API 限流时优雅退化成打印 Actions 链接 |
+
+第 3 步的 `pull --rebase` 是必须的：工作流里的机器人会把 `Gemfile.lock` 提交回仓库，
+你的本地克隆会落后一个 commit，直接 push 会被拒绝。
+
+第 5 步用 GitHub 的公开 API 查询，**未登录状态下每小时只能查 60 次**，
+所以频繁发布会看到「触发了限流」的提示——这不是错误，去 Actions 页面看即可。
+
+### 每天的流程长什么样
+
+```bash
+# 1. 写内容（改 Markdown、加攻略、改 _data/versions.yml）
+# 2. 发布
+npm run publish -- -m "新增 XX 攻略"
+# 3. 等它打印出「✓ 构建与部署成功」和站点地址
+```
+
 ---
 
 ## 四、游戏更新后怎么维护（这是本站的核心机制）
