@@ -631,6 +631,92 @@ if (fs.existsSync(sassDir)) {
 }
 
 // ============================================================
+// include 标签的参数语法
+// ------------------------------------------------------------
+// Jekyll 的 include 会**校验参数格式**（name=value，值须是变量路径或引号字符串）。
+// ⚠️ 关键：Liquid 会解析 {% comment %} 块**内部**的标签（只是不渲染结果），
+//    所以注释里写坏了的示例照样能让整站构建失败 ——
+//    而且报错信息指向「调用该 include 的页面」，很难倒着找回来。
+// 实测踩过：注释里写了 pet=某个宠物对象（中文占位符）→ 整站构建失败。
+// 用 {% raw %} 包住示例也没用（raw 同样是被解析的标签）。
+// ⇒ 结论：注释里只写文字描述，不要写带百分号括号的标签示例。
+// ============================================================
+const INCLUDE_VALUE_OK = /^("[^"]*"|'[^']*'|[\w.\-]+|-\d+)$/;
+
+/** 按空白切分，但**引号内的空格不算分隔符** ——
+ *  hint="这里后续放… NPC 的位置与作用。" 这种带空格的中文值是完全合法的，
+ *  按空格硬拆会把一个参数拆成三截，误报成语法错误。*/
+function splitLiquidArgs(s) {
+  const out = [];
+  let cur = "";
+  let q = null;
+  for (const c of s) {
+    if (q) {
+      cur += c;
+      if (c === q) q = null;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      q = c;
+      cur += c;
+      continue;
+    }
+    if (/\s/.test(c)) {
+      if (cur) {
+        out.push(cur);
+        cur = "";
+      }
+      continue;
+    }
+    cur += c;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+const includeTargets = [
+  ...(fs.existsSync(incDir) ? walkIncludes(incDir) : []),
+  ...walk(ROOT).filter(
+    (p) =>
+      p.endsWith(".md") &&
+      !p.includes(`${path.sep}node_modules${path.sep}`) &&
+      !p.startsWith(GUIDES_DIR + path.sep)
+  ),
+];
+let includeIssues = 0;
+for (const f of includeTargets) {
+  const relPath = rel(f);
+  if (relPath === "README.md") continue; // 文档，不参与构建
+  const src = fs.readFileSync(f, "utf8");
+  const re = /\{%-?\s*include\s+([\s\S]*?)%\}/g;
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    // 去掉紧跟在结尾的 `-`（来自 `-%}`）
+    const body = m[1].replace(/-$/, "").trim();
+    const parts = splitLiquidArgs(body);
+    if (parts.length === 0) continue; // 空 include（注释里出现过），实测不报错
+    const incFile = parts.shift();
+    if (!/^[\w./-]+$/.test(incFile)) {
+      E(relPath, `include 文件名不合法：${incFile}`);
+      includeIssues++;
+      continue;
+    }
+    for (const arg of parts) {
+      const eq = arg.indexOf("=");
+      const name = eq < 0 ? arg : arg.slice(0, eq);
+      const val = eq < 0 ? "" : arg.slice(eq + 1);
+      if (eq < 0 || !/^[\w-]+$/.test(name) || !INCLUDE_VALUE_OK.test(val)) {
+        E(relPath, `include 参数不合法：${arg}（应为 name=值，值是变量路径或引号字符串）`);
+        includeIssues++;
+      }
+    }
+  }
+}
+if (includeIssues === 0) {
+  console.log("  · include 参数：已检查，语法正常");
+}
+
+// ============================================================
 // 7. 其他
 // ============================================================
 if (fs.existsSync(path.join(ROOT, "CNAME"))) {

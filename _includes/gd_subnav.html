@@ -1,12 +1,15 @@
 {%- comment -%}
 游戏数据各页之间的快捷导航。
-  用法： {% include gd_subnav.html active="weapons" %}
+  用法：在页面里 include 本文件，并传入参数 active（值为当前分类的英文名，如 weapons）。
 
 ⚠️ 这里的局部变量一律加 gdNav 前缀。
-   Jekyll 的 {% include %} 与外层**共享作用域**：include 里的 assign 会覆盖父级同名变量。
-   曾经这里用了变量名 `items`，把页面顶部的 `items`（武器列表）覆盖成了 7 个导航项，
+   Jekyll 的 include 与外层**共享作用域**：include 里的 assign 会覆盖父级同名变量。
+   曾经这里用了变量名 items，把页面顶部的 items（武器列表）覆盖成了 7 个导航项，
    结果表格渲染出 7 行空数据 —— 而且不报任何错，只是内容凭空消失。
    所以包含文件里的变量名必须加前缀，别用 items / data / list 这类通用名。
+
+⚠️ 注释里不要写带百分号括号的 include 示例：Liquid 会解析 comment 块内部的标签，
+   参数不合法时同样会让整站构建失败（见 gd_pet_pops.html 里的说明）。
 {%- endcomment -%}
 {%- assign gdNavRaw = "weapons|武器,armors|防具,sets|套装,wildcard|万能散搭装,skills|技能,states|状态,pets|宠物" | split: "," -%}
 <nav class="gd-subnav" aria-label="游戏数据分类">
