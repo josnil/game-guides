@@ -792,13 +792,27 @@ def main():
                     from PIL import Image
                     import io
                     im = Image.open(io.BytesIO(png)).convert("RGBA")
-                    # 图标雪碧图有 80 多万种颜色（抗锯齿/渐变），RGBA 直存要 4MB。
-                    # 量化到 256 色后约 1MB，32×32 的小图标看不出差别 —— 而这文件
-                    # 只要展示图标就会加载一次，体积值得优化。
-                    im.convert("RGB").quantize(colors=256, method=Image.MEDIANCUT,
-                                               dither=Image.NONE).save(dst, "PNG", optimize=True)
-                    log(f"图标：{w}x{h}，{icon_meta['count']} 个（{w // ICON_CELL} 列 × {h // ICON_CELL} 行）"
-                        f"  解密 {len(png) / 1048576:.2f}MB → 量化 256 色 {os.path.getsize(dst) / 1048576:.2f}MB")
+                    # ⚠️ 这里**不能**先 convert("RGB")：
+                    #    图标的背景是「透明白」(255,255,255,0)，convert("RGB") 会丢掉 alpha，
+                    #    透明背景变成不透明的近白色 —— 图标于是在浅色纸面上彻底看不见，
+                    #    而且**不会报任何错误**（我踩过：页面结构、图标元素、请求全都正常，
+                    #    就是看不见）。FASTOCTREE 的调色板量化支持 alpha，体积反而更小。
+                    im.quantize(colors=256, method=Image.FASTOCTREE).save(
+                        dst, "PNG", optimize=True)
+
+                    # 写完自查：抽一格确认背景仍是透明的。
+                    # 这类「静默失效」必须靠断言拦，人眼在低分辨率截图上根本看不出来。
+                    chk = Image.open(dst).convert("RGBA")
+                    sample = chk.crop((192, 1088, 224, 1120))
+                    px = list(sample.getdata())
+                    transparent = sum(1 for q in px if q[3] == 0)
+                    if transparent < 100:
+                        log(f"  ✗ 图标雪碧图丢失透明度（该格只有 {transparent}/1024 个透明像素）"
+                            f" —— 图标会在浅色背景上不可见，请检查量化方式")
+                        return 1
+                    log(f"图标：{w}x{h}，{icon_meta['count']} 个（{w // ICON_CELL} 列 × "
+                        f"{h // ICON_CELL} 行）  解密 {len(png) / 1048576:.2f}MB → "
+                        f"量化 {os.path.getsize(dst) / 1048576:.2f}MB（透明度已校验）")
                 except ImportError:
                     open(dst, "wb").write(png)
                     log(f"图标：{w}x{h}（没装 Pillow，直接写原图 {len(png) / 1048576:.2f}MB）")
