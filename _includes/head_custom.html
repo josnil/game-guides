@@ -1,6 +1,26 @@
 {%- comment -%}
 主题预留的 <head> 注入点。
-这里挂上游戏数据页的表格筛选脚本（defer，不阻塞渲染）。
-没有表格的页面加载了也不会有任何副作用。
 {%- endcomment -%}
+
+{%- comment -%}
+⚠️ 图标雪碧图的地址必须由 Liquid 生成，**不能在 SCSS 里写死**。
+   本站的 baseurl 是 /game-guides，SCSS 里写 url("/assets/…") 会解析到站点根
+   （josnil.github.io/assets/…），而不是 /game-guides/assets/… —— 图标会全部 404，
+   而且页面上不会报任何错，只是图标凭空消失。
+   （验收时也要注意：光确认「文件在那个 URL 存在」是不够的，
+     还要确认「CSS 指向的就是那个 URL」。）
+{%- endcomment -%}
+{%- assign gdIcon = site.data.gamedata.meta.icons -%}
+{%- if gdIcon and gdIcon.file -%}
+  {%- assign gdIconW = gdIcon.cols | times: gdIcon.cell -%}
+  {%- assign gdIconH = gdIcon.rows | times: gdIcon.cell -%}
+  <style>
+    :root {
+      --gd-icon-url: url("{{ gdIcon.file | relative_url }}");
+      --gd-icon-w: {{ gdIconW }}px;
+      --gd-icon-h: {{ gdIconH }}px;
+    }
+  </style>
+{%- endif -%}
+
 <script src="{{ '/assets/js/gd-table.js' | relative_url }}" defer></script>

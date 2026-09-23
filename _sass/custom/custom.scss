@@ -1036,15 +1036,19 @@
 // ============================================================
 
 // ---------- 9.1 图标（IconSet 雪碧图）----------
-// 2016 个图标共存在一张 512×4032 的图里，用 background-position 定位，
-// 所以不需要切 2016 个文件。每格 32×32。
+// 2016 个图标共存在一张图里，用 background-position 定位，不需要切 2016 个文件。
+// 每格 32×32。
+//
+// ⚠️ 图片地址来自 --gd-icon-url，由 _includes/head_custom.html 用 Liquid 注入。
+//    不要在 SCSS 里写死 url("/assets/…")：本站有 baseurl（/game-guides），
+//    写死会指向站点根，图标全部 404 且不报错，只是凭空消失。
 .gd-icon {
   display: inline-block;
   flex: 0 0 auto;
   width: 32px;
   height: 32px;
   vertical-align: middle;
-  background-image: url("/assets/gamedata/iconset.png");
+  background-image: var(--gd-icon-url);
   background-repeat: no-repeat;
   // 图标本身是像素画，放大时保持硬边
   image-rendering: pixelated;
@@ -1054,7 +1058,7 @@
 .gd-icon--sm {
   width: 24px;
   height: 24px;
-  background-size: 384px 3024px; // 512×0.75 , 4032×0.75
+  background-size: calc(var(--gd-icon-w) * 0.75) calc(var(--gd-icon-h) * 0.75);
 }
 
 // 图标 + 文字的常见组合
@@ -1180,6 +1184,22 @@
 
   tbody tr:hover {
     background-color: rgba(212, 160, 74, 0.08);
+  }
+
+  // 列宽：让「最后一列」（说明/描述）吸收多余宽度。
+  // 不这么做的话，浏览器会把额外空间按内容多少分配，
+  // 于是「属性区间」这种小标签堆得最多的列吃掉一大片空白，
+  // 而名称列被挤到 55px、四五个字的名字折成两行。
+  th:last-child,
+  td:last-child {
+    width: 100%;
+  }
+
+  // 名称列保底宽度。:has 只命中「图标 + 名称」这种单元格，
+  // 不会波及状态表里那个纯图标的首列（那一列是 inline 的 width:4rem）。
+  // 浏览器不支持 :has 时这条会被忽略，不影响可用性。
+  td:first-child:has(.gd-name) {
+    min-width: 9.5rem;
   }
 
   // 数字列：等宽对齐，扫起来快
