@@ -1,0 +1,47 @@
+{%- comment -%}
+世界大地图：按数据在图上放置可点击的地点按钮。
+  数据来源：_data/maps.json（由 tools/build-maps.py 从游戏 data/ 生成）
+  交互：悬停浮现地点名；点击进入该地点页面。
+  位置用百分比，所以图片怎么缩放，按钮都跟着对齐。
+{%- endcomment -%}
+{%- assign wm = site.data.maps.world -%}
+<div class="wb-worldmap">
+  <div class="wb-worldmap__stage">
+    <img
+      class="wb-worldmap__img"
+      src="{{ wm.image | relative_url }}"
+      alt="{{ wm.title }}"
+      width="{{ wm.w }}"
+      height="{{ wm.h }}"
+      decoding="async">
+
+    {%- for p in site.data.maps.places -%}
+      {%- if p.url -%}
+        <a class="wb-poi"
+           href="{{ p.url | relative_url }}"
+           style="left: {{ p.x }}%; top: {{ p.y }}%"
+           aria-label="{{ p.title }}">
+          <span class="wb-poi__dot" aria-hidden="true"></span>
+          <span class="wb-poi__label">{{ p.title }}</span>
+        </a>
+      {%- else -%}
+        {%- comment -%}
+          游戏数据里有传送事件、但地图树里找不到同名地图（例如「火之洞窟内部 2」）。
+          保留标记让位置信息完整，但不可点击，并在名牌里说明原因。
+        {%- endcomment -%}
+        <span class="wb-poi wb-poi--off"
+              style="left: {{ p.x }}%; top: {{ p.y }}%"
+              role="img"
+              aria-label="{{ p.title }}，地图数据未收录">
+          <span class="wb-poi__dot" aria-hidden="true"></span>
+          <span class="wb-poi__label">{{ p.title }}<em>地图数据未收录</em></span>
+        </span>
+      {%- endif -%}
+    {%- endfor -%}
+  </div>
+
+  <p class="wb-worldmap__hint">
+    鼠标移到标记上可以看到地点名，点一下进入该地点的地图。
+    窄屏上标记较小，也可以用下面的地点清单或左侧目录进入。
+  </p>
+</div>

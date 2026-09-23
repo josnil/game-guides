@@ -1,0 +1,229 @@
+{
+ "world": {
+  "title": "世界大地图",
+  "id": 28,
+  "url": "/map/",
+  "image": "/assets/maps/28.png",
+  "w": 1800,
+  "h": 1800
+ },
+ "places": [
+  {
+   "title": "雪城",
+   "mapId": 79,
+   "exits": 1,
+   "x": 31.875,
+   "y": 6.875,
+   "url": "/map/79/",
+   "image": "/assets/maps/79.png",
+   "w": 1400,
+   "h": 1172
+  },
+  {
+   "title": "雪之森入口",
+   "mapId": 84,
+   "exits": 1,
+   "x": 23.125,
+   "y": 15.625,
+   "url": "/map/84/",
+   "image": "/assets/maps/84.png",
+   "w": 1400,
+   "h": 1400
+  },
+  {
+   "title": "魔法研究院",
+   "mapId": 90,
+   "exits": 4,
+   "x": 5.0,
+   "y": 17.5,
+   "url": "/map/90/",
+   "image": "/assets/maps/90.png",
+   "w": 1104,
+   "h": 1104
+  },
+  {
+   "title": "黑风寨",
+   "mapId": 33,
+   "exits": 1,
+   "x": 29.375,
+   "y": 31.875,
+   "url": "/map/33/",
+   "image": "/assets/maps/33.png",
+   "w": 1400,
+   "h": 467
+  },
+  {
+   "title": "闲鱼村",
+   "mapId": 27,
+   "exits": 1,
+   "x": 58.125,
+   "y": 30.625,
+   "url": "/map/27/",
+   "image": "/assets/maps/27.png",
+   "w": 1248,
+   "h": 1248
+  },
+  {
+   "title": "迷幻深林",
+   "mapId": 31,
+   "exits": 1,
+   "x": 44.375,
+   "y": 34.375,
+   "url": "/map/31/",
+   "image": "/assets/maps/31.png",
+   "w": 1400,
+   "h": 622
+  },
+  {
+   "title": "养殖场",
+   "mapId": 14,
+   "exits": 1,
+   "x": 61.875,
+   "y": 36.875,
+   "url": "/map/14/",
+   "image": "/assets/maps/14.png",
+   "w": 1400,
+   "h": 447
+  },
+  {
+   "title": "龙虎门",
+   "mapId": 142,
+   "exits": 4,
+   "x": 2.5,
+   "y": 40.0,
+   "url": "/map/142/",
+   "image": "/assets/maps/142.png",
+   "w": 1400,
+   "h": 920
+  },
+  {
+   "title": "叛军营地",
+   "mapId": 52,
+   "exits": 1,
+   "x": 21.875,
+   "y": 43.125,
+   "url": "/map/52/",
+   "image": "/assets/maps/52.png",
+   "w": 1200,
+   "h": 1200
+  },
+  {
+   "title": "锦芯城",
+   "mapId": 42,
+   "exits": 1,
+   "x": 43.125,
+   "y": 46.875,
+   "url": "/map/42/",
+   "image": "/assets/maps/42.png",
+   "w": 1200,
+   "h": 1680
+  },
+  {
+   "title": "五毒沼泽入口",
+   "mapId": 62,
+   "exits": 1,
+   "x": 76.875,
+   "y": 43.125,
+   "url": "/map/62/",
+   "image": "/assets/maps/62.png",
+   "w": 1200,
+   "h": 1680
+  },
+  {
+   "title": "银滩村",
+   "mapId": 36,
+   "exits": 2,
+   "x": 25.0,
+   "y": 58.125,
+   "url": "/map/36/",
+   "image": "/assets/maps/36.png",
+   "w": 1400,
+   "h": 910
+  },
+  {
+   "title": "雇佣兵城堡",
+   "mapId": 58,
+   "exits": 4,
+   "x": 43.75,
+   "y": 61.25,
+   "url": "/map/58/",
+   "image": "/assets/maps/58.png",
+   "w": 1200,
+   "h": 1536
+  },
+  {
+   "title": "文殊院",
+   "mapId": 122,
+   "exits": 1,
+   "x": 70.625,
+   "y": 65.625,
+   "url": "/map/122/",
+   "image": "/assets/maps/122.png",
+   "w": 816,
+   "h": 1152
+  },
+  {
+   "title": "金字塔",
+   "mapId": 116,
+   "exits": 1,
+   "x": 4.375,
+   "y": 70.625,
+   "url": "/map/116/",
+   "image": "/assets/maps/116.png",
+   "w": 1400,
+   "h": 1355
+  },
+  {
+   "title": "熔岩城",
+   "mapId": 3,
+   "exits": 4,
+   "x": 38.75,
+   "y": 85.0,
+   "url": "/map/3/",
+   "image": "/assets/maps/3.png",
+   "w": 1400,
+   "h": 814
+  },
+  {
+   "title": "黄金城",
+   "mapId": 71,
+   "exits": 4,
+   "x": 13.75,
+   "y": 95.0,
+   "url": "/map/71/",
+   "image": "/assets/maps/71.png",
+   "w": 1400,
+   "h": 1400
+  },
+  {
+   "title": "火之洞窟内部 2",
+   "mapId": null,
+   "exits": 1,
+   "x": 45.625,
+   "y": 96.875,
+   "url": null
+  },
+  {
+   "title": "墓园入口",
+   "mapId": 77,
+   "exits": 3,
+   "x": 4.375,
+   "y": 98.125,
+   "url": "/map/77/",
+   "image": "/assets/maps/77.png",
+   "w": 1200,
+   "h": 1200
+  },
+  {
+   "title": "魔王遗迹",
+   "mapId": 106,
+   "exits": 4,
+   "x": 93.75,
+   "y": 97.5,
+   "url": "/map/106/",
+   "image": "/assets/maps/106.png",
+   "w": 1400,
+   "h": 1618
+  }
+ ]
+}

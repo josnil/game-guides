@@ -476,6 +476,32 @@ if (pets && Array.isArray(pets.items)) {
   for (const it of pets.items) checkNavTarget("_data/pets.yml", it.url);
 }
 
+// 地图数据由 tools/build-maps.py 生成，容易出现「数据更新了但图片没提交」
+// 或「地图改名后 slug 对不上」这类脱节，所以这里连图片文件一起体检。
+const maps = loadData("maps.json");
+if (maps && maps.world) {
+  checkNavTarget("_data/maps.json", maps.world.url);
+  for (const p of maps.places || []) {
+    if (p.url) checkNavTarget("_data/maps.json", p.url);
+  }
+
+  let imgChecked = 0;
+  for (const item of [maps.world, ...(maps.places || [])]) {
+    if (!item || !item.image) continue;
+    imgChecked++;
+    const local = path.join(ROOT, String(item.image).replace(/^\//, ""));
+    if (!fs.existsSync(local)) {
+      E(
+        "_data/maps.json",
+        `地图图片不存在：${item.image}（${item.title}）—— 重新执行 python tools/build-maps.py 生成`
+      );
+    }
+  }
+  const placeCount = (maps.places || []).length;
+  if (placeCount === 0) W("_data/maps.json", "没有任何地点条目");
+  console.log(`  · 地图数据：${placeCount} 个地点，已核对 ${imgChecked} 个图片文件`);
+}
+
 // ============================================================
 // 7. 其他
 // ============================================================

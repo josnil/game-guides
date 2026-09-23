@@ -678,3 +678,338 @@
     margin-bottom: 0.5rem;
   }
 }
+
+// ============================================================
+// 8. 地图：世界大地图上的地点按钮 + 地点图上的事件打点
+// ------------------------------------------------------------
+// 坐标策略：位置用百分比（跟随图片缩放），尺寸用 px（保证可读与可点）。
+// 注意：舞台容器不能设 overflow:hidden，否则悬停名牌会被裁掉。
+// ============================================================
+
+// ---------- 8.1 世界大地图 ----------
+.wb-worldmap {
+  margin: 1.6rem 0 2rem;
+}
+
+.wb-worldmap__stage {
+  position: relative;
+  line-height: 0; // 去掉图片下方的行高缝隙
+  border: 1px solid var(--wb-paper-300);
+  border-radius: 12px;
+  background-color: var(--wb-paper-200);
+  box-shadow: 0 1px 2px rgba(31, 27, 22, 0.06), 0 12px 28px -18px rgba(31, 27, 22, 0.45);
+}
+
+.wb-worldmap__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 11px;
+}
+
+.wb-worldmap__hint {
+  margin: 0.7rem 0 0;
+  color: var(--wb-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+// 地点按钮：44×44 的命中区，内部只画一个小标记
+.wb-poi {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+  text-decoration: none;
+  cursor: pointer;
+  // 命中区不可见，标记本身由 __dot 绘制
+  background: none;
+  border: 0;
+  padding: 0;
+
+  &:hover,
+  &:focus-visible {
+    z-index: 5; // 悬停时压住邻近标记，名牌才不会被盖住
+  }
+}
+
+.wb-poi__dot {
+  display: block;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid #fffdf8;
+  background: radial-gradient(circle at 35% 30%, var(--wb-gold-200), var(--wb-gold-500) 70%);
+  box-shadow:
+    0 0 0 1px rgba(31, 27, 22, 0.55),
+    0 0 0 6px rgba(212, 160, 74, 0.16);
+  transition:
+    transform 0.22s var(--wb-ease),
+    box-shadow 0.22s var(--wb-ease);
+}
+
+.wb-poi__label {
+  position: absolute;
+  bottom: calc(100% - 6px);
+  left: 50%;
+  z-index: 1;
+  padding: 0.3rem 0.6rem;
+  transform: translate(-50%, 4px);
+  border: 1px solid rgba(212, 160, 74, 0.5);
+  border-radius: 8px;
+  background-color: rgba(13, 20, 28, 0.94);
+  color: var(--wb-on-ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.22s var(--wb-ease);
+
+  em {
+    display: block;
+    margin-top: 1px;
+    color: var(--wb-on-ink-faint);
+    font-size: 0.68rem;
+    font-style: normal;
+    font-weight: 400;
+  }
+}
+
+.wb-poi:hover,
+.wb-poi:focus-visible {
+  .wb-poi__dot {
+    transform: scale(1.25);
+    box-shadow:
+      0 0 0 1px rgba(31, 27, 22, 0.6),
+      0 0 0 9px rgba(212, 160, 74, 0.24);
+  }
+
+  .wb-poi__label {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.wb-poi:focus-visible {
+  outline: 2px solid var(--wb-gold-500);
+  outline-offset: -10px;
+  border-radius: 50%;
+}
+
+// 有传送事件、但地图树里没有对应地图的地点（例如「火之洞窟内部 2」）
+.wb-poi--off {
+  cursor: not-allowed;
+
+  .wb-poi__dot {
+    border-color: rgba(255, 253, 248, 0.6);
+    background: radial-gradient(circle at 35% 30%, #9aa4ae, #5c6670 70%);
+    box-shadow: 0 0 0 1px rgba(31, 27, 22, 0.45);
+  }
+
+  &:hover .wb-poi__dot {
+    transform: none;
+  }
+}
+
+// ---------- 8.2 地点地图查看器 ----------
+.wb-mapview {
+  margin: 1.5rem 0 1.2rem;
+}
+
+.wb-mapview__stage {
+  position: relative;
+  line-height: 0;
+  max-width: 100%;
+  border: 1px solid var(--wb-paper-300);
+  border-radius: 12px;
+  // 地图可能比正文宽，超出时横向滚动查看（打点是装饰性绝对定位，不受影响）
+  overflow: auto;
+  background-color: var(--wb-paper-200);
+  box-shadow: 0 1px 2px rgba(31, 27, 22, 0.06), 0 12px 28px -18px rgba(31, 27, 22, 0.45);
+
+  // 图片很小时不要拉伸出空白
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: 11px;
+  }
+}
+
+// 打点层：绝对覆盖整张图，随图一起缩放
+.wb-mapview__marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.wb-mapview__dot {
+  position: absolute;
+  display: block;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 253, 248, 0.92);
+  background-color: var(--wb-gold-500);
+  box-shadow:
+    0 0 0 1px rgba(31, 27, 22, 0.5),
+    0 0 10px 2px rgba(212, 160, 74, 0.55);
+}
+
+.wb-mapview__cap {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+  color: var(--wb-text-muted);
+  font-size: 0.82rem;
+}
+
+.wb-mapview__key {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 253, 248, 0.92);
+  background-color: var(--wb-gold-500);
+  box-shadow: 0 0 0 1px rgba(31, 27, 22, 0.4);
+}
+
+.wb-map__back {
+  margin-top: 1.6rem;
+  font-size: 0.88rem;
+}
+
+.wb-offmark {
+  color: var(--wb-text-muted);
+  font-size: 0.78rem;
+}
+
+// 维护者说明（可折叠）
+.wb-note {
+  margin-top: 2rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--wb-paper-300);
+  border-radius: 10px;
+  background-color: rgba(255, 253, 248, 0.65);
+  color: var(--wb-text-muted);
+  font-size: 0.85rem;
+
+  summary {
+    cursor: pointer;
+    color: var(--wb-text-head);
+    font-weight: 600;
+  }
+
+  p {
+    margin: 0.6rem 0 0;
+    line-height: 1.7;
+  }
+}
+
+// ---------- 8.3 侧边栏里的地图模块 ----------
+.wb-mod__count {
+  margin-left: auto;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background-color: rgba(212, 160, 74, 0.16);
+  color: var(--wb-gold-400);
+  font-family: var(--wb-font-num);
+  font-size: 0.68rem;
+  letter-spacing: 0;
+}
+
+// 「世界大地图」入口：比普通条目更突出
+.wb-worldlink {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 46px;
+  margin: 0 0.1rem 0.35rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(212, 160, 74, 0.35);
+  border-radius: 10px;
+  background-image: linear-gradient(100deg, rgba(212, 160, 74, 0.14), rgba(212, 160, 74, 0.03));
+  color: var(--wb-on-ink);
+  text-decoration: none;
+  transition:
+    background-image 0.22s ease,
+    border-color 0.22s ease,
+    transform 0.22s var(--wb-ease);
+
+  &:hover,
+  &:focus-visible {
+    border-color: rgba(212, 160, 74, 0.75);
+    background-image: linear-gradient(100deg, rgba(212, 160, 74, 0.26), rgba(212, 160, 74, 0.08));
+    transform: translateX(2px);
+  }
+
+  &.is-here {
+    border-color: var(--wb-gold-500);
+  }
+}
+
+.wb-worldlink__mark {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #fffdf8;
+  background: radial-gradient(circle at 35% 30%, var(--wb-gold-200), var(--wb-gold-500) 70%);
+  box-shadow: 0 0 0 1px rgba(31, 27, 22, 0.5);
+}
+
+.wb-worldlink__txt {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+// 地点多，给个限高滚动区，避免把下面两个模块挤到屏幕外
+.wb-scroll {
+  max-height: 21rem;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+  scrollbar-color: var(--wb-ink-700) transparent;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--wb-ink-700);
+    border-radius: 4px;
+  }
+}
+
+// 单列条目（地点 / 宠物用，不需要大编号那一栏）
+.wb-item--slim .wb-item__link {
+  grid-template-columns: 1fr;
+  min-height: 44px; // 触摸目标下限
+  padding-left: 0.85rem;
+}
+
+.wb-item__sub {
+  display: block;
+  margin-top: 1px;
+  color: var(--wb-on-ink-faint);
+  font-size: 0.7rem;
+}
+
+.wb-item__link--off {
+  cursor: not-allowed;
+  color: var(--wb-on-ink-faint);
+
+  &:hover::before,
+  &:hover::after {
+    transform: scaleX(0);
+  }
+}

@@ -6,6 +6,7 @@
   "description": "本地预检：在没有 Ruby/Jekyll 的环境下，尽量提前发现 front matter 与配置错误",
   "scripts": {
     "check": "node tools/precheck.mjs",
+    "maps": "python tools/build-maps.py",
     "publish": "node tools/publish.mjs",
     "publish:dry": "node tools/publish.mjs --dry-run"
   },

@@ -4,12 +4,53 @@
 ⚠️ 根节点必须保持 <nav id="site-nav" class="site-nav">：
    主题的样式与移动端抽屉开合脚本都依赖这个 id / class。
 
-内容替换为两个模块，数据来自 _data/：
-  - 阶段攻略   ← _data/stages.yml
-  - 宠物培养建议 ← _data/pets.yml
+三个模块，数据全部来自 _data/（不用改这个文件就能增删条目）：
+  地图         ← _data/maps.json（由 tools/build-maps.py 从游戏 data/ 生成）
+  阶段攻略      ← _data/stages.yml
+  宠物培养建议   ← _data/pets.yml
 {%- endcomment -%}
+{%- assign wm = site.data.maps.world -%}
 <nav aria-label="攻略目录" id="site-nav" class="site-nav">
 
+  {%- comment -%} ========== 模块一：地图 ========== {%- endcomment -%}
+  <section class="wb-mod">
+    <h2 class="wb-mod__title">
+      <span class="wb-mod__zh">地图</span>
+      <span class="wb-mod__en">Maps</span>
+      <span class="wb-mod__count">{{ site.data.maps.places.size }}</span>
+    </h2>
+
+    <a class="wb-worldlink{% if page.url == wm.url %} is-here{% endif %}"
+       href="{{ wm.url | relative_url }}">
+      <span class="wb-worldlink__mark" aria-hidden="true"></span>
+      <span class="wb-worldlink__txt">{{ wm.title }}</span>
+    </a>
+
+    <ul class="wb-mod__list wb-scroll">
+      {%- for p in site.data.maps.places -%}
+        {%- assign is_here = false -%}
+        {%- if p.url and page.url == p.url -%}{%- assign is_here = true -%}{%- endif -%}
+        <li class="wb-item wb-item--slim{% if is_here %} is-here{% endif %}">
+          {%- if p.url -%}
+            <a class="wb-item__link" href="{{ p.url | relative_url }}">
+              <span class="wb-item__body">
+                <span class="wb-item__name">{{ p.title }}</span>
+              </span>
+            </a>
+          {%- else -%}
+            <span class="wb-item__link wb-item__link--off">
+              <span class="wb-item__body">
+                <span class="wb-item__name">{{ p.title }}</span>
+                <span class="wb-item__sub">地图数据未收录</span>
+              </span>
+            </span>
+          {%- endif -%}
+        </li>
+      {%- endfor -%}
+    </ul>
+  </section>
+
+  {%- comment -%} ========== 模块二：阶段攻略 ========== {%- endcomment -%}
   <section class="wb-mod">
     <h2 class="wb-mod__title">
       <span class="wb-mod__zh">阶段攻略</span>
@@ -33,6 +74,7 @@
     </ul>
   </section>
 
+  {%- comment -%} ========== 模块三：宠物培养建议 ========== {%- endcomment -%}
   <section class="wb-mod">
     <h2 class="wb-mod__title">
       <span class="wb-mod__zh">宠物培养建议</span>
@@ -45,7 +87,7 @@
         {%- for item in pets -%}
           {%- assign is_here = false -%}
           {%- if page.url == item.url -%}{%- assign is_here = true -%}{%- endif -%}
-          <li class="wb-item{% if is_here %} is-here{% endif %}">
+          <li class="wb-item wb-item--slim{% if is_here %} is-here{% endif %}">
             <a class="wb-item__link" href="{{ item.url | relative_url }}">
               <span class="wb-item__body">
                 <span class="wb-item__name">{{ item.title }}</span>

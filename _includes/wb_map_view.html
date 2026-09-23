@@ -1,0 +1,33 @@
+{%- comment -%}
+地点地图查看器：地图图片 + 事件位置打点。
+  参数：map_id（对应 _data/map_events.json 的键）、src、alt、w、h、count、exits
+  只标注「有事件的格子」，不展示事件内容。
+  打点是纯装饰（aria-hidden），不参与交互，避免挡住图片。
+{%- endcomment -%}
+{%- assign marks = site.data.map_events[include.map_id] -%}
+<figure class="wb-mapview">
+  <div class="wb-mapview__stage">
+    <img
+      class="wb-mapview__img"
+      src="{{ include.src | relative_url }}"
+      alt="{{ include.alt }}"
+      width="{{ include.w }}"
+      height="{{ include.h }}"
+      loading="lazy"
+      decoding="async">
+
+    {%- if marks and marks.size > 0 -%}
+      <span class="wb-mapview__marks" aria-hidden="true">
+        {%- for m in marks -%}<i class="wb-mapview__dot" style="left: {{ m.x }}%; top: {{ m.y }}%"></i>{%- endfor -%}
+      </span>
+    {%- endif -%}
+  </div>
+
+  <figcaption class="wb-mapview__cap">
+    <span class="wb-mapview__key" aria-hidden="true"></span>
+    图上共 <b>{{ include.count | default: 0 }}</b> 处事件位置
+    {%- if include.exits and include.exits > 1 -%}
+      ，{{ include.exits }} 个出入口
+    {%- endif -%}
+  </figcaption>
+</figure>
