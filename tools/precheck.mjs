@@ -551,6 +551,50 @@ if (petsData && Array.isArray(petsData.pets)) {
 }
 
 // ============================================================
+// include 里的通用变量名
+// ------------------------------------------------------------
+// Jekyll 的 {% include %} 与外层共享作用域：include 里 assign 的变量会覆盖
+// 调用页面的同名变量，而且不报错。曾经 gd_subnav.html 里的 `items` 把页面顶部的
+// 武器列表覆盖成了 7 个导航字符串，表格渲染成 7 行空数据、页面从 198KB 缩到 20KB，
+// 构建却完全成功。这里做一道机械防线：include 里不许用通用变量名。
+// ============================================================
+const GENERIC_NAMES = new Set([
+  "items", "data", "list", "v", "p", "it", "s", "k", "i", "n", "x", "y",
+  "name", "value", "parts", "arr", "tmp", "result", "out", "key", "count",
+  "total", "idx", "first", "last", "set", "meta", "nav", "pets", "stages",
+]);
+
+function walkIncludes(dir) {
+  const out = [];
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...walkIncludes(p));
+    else if (e.name.endsWith(".html")) out.push(p);
+  }
+  return out;
+}
+
+const incDir = path.join(ROOT, "_includes");
+if (fs.existsSync(incDir)) {
+  let offenders = 0;
+  for (const f of walkIncludes(incDir)) {
+    const txt = fs.readFileSync(f, "utf8");
+    const names = new Set(
+      [...txt.matchAll(/{%-?\s*assign\s+([A-Za-z_][\w]*)/g)].map((m) => m[1])
+    );
+    const bad = [...names].filter((x) => GENERIC_NAMES.has(x));
+    if (bad.length) {
+      offenders++;
+      E(rel(f), `include 里用了通用变量名 ${bad.join(", ")} —— ` +
+        `Jekyll 的 include 会覆盖调用页面的同名变量，请加前缀（如 gdNavXxx）`);
+    }
+  }
+  if (offenders === 0) {
+    console.log("  · include 变量名：已检查，无通用名冲突风险");
+  }
+}
+
+// ============================================================
 // 7. 其他
 // ============================================================
 if (fs.existsSync(path.join(ROOT, "CNAME"))) {
