@@ -20,8 +20,13 @@ theme: just-the-docs
 #   项目站点  <user>.github.io/<repo> ->  https://<user>.github.io
 #   自定义域名                         ->  https://guide.example.com
 # 注意：url 只写到域名，不要带仓库路径（路径交给 --baseurl）。
+#
+# 本项目是「项目站点」，上线后访问地址是：
+#     https://josnil.github.io/game-guides/
+# 所以 url 填域名本身即可。若以后把仓库改名为 josnil.github.io（用户站点），
+# 这一行不用改，访问地址会变成 https://josnil.github.io/
 # ------------------------------------------------------------
-url: https://example.github.io
+url: https://josnil.github.io
 
 # 插件。这里列出的插件必须同时出现在 Gemfile 的 :jekyll_plugins 组里，
 # 否则 Jekyll 会报 "could not be found"。
