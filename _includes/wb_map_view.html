@@ -1,10 +1,22 @@
 {%- comment -%}
 地点地图查看器：地图图片 + 事件位置打点。
   参数：map_id（对应 _data/map_events.json 的键）、src、alt、w、h、count、exits
-  只标注「有事件的格子」，不展示事件内容。
-  打点是纯装饰（aria-hidden），不参与交互，避免挡住图片。
+
+  两个开关写在 _data/site_options.yml，改完 push 即生效：
+    place_map.markers —— 是否打点（关掉就是一张干净的地图）
+    place_map.tooltip —— 打点上是否显示浮窗（默认关；打开只显示图块坐标）
+
+  打点是装饰性的（aria-hidden + pointer-events:none），不挡图片、不参与交互。
+
+  最下面那张「打点坐标对照表」是给维护者用的：
+  照着它填 _data/map_overrides.yml 就能增删打点，重新生成也不会被冲掉。
 {%- endcomment -%}
 {%- assign marks = site.data.map_events[include.map_id] -%}
+{%- assign popts = site.data.site_options.place_map -%}
+{%- assign show_marks = true -%}
+{%- if popts.markers == false -%}{%- assign show_marks = false -%}{%- endif -%}
+{%- assign show_tip = false -%}
+{%- if popts.tooltip == true -%}{%- assign show_tip = true -%}{%- endif -%}
 <figure class="wb-mapview">
   <div class="wb-mapview__stage">
     <img
@@ -16,18 +28,48 @@
       loading="lazy"
       decoding="async">
 
-    {%- if marks and marks.size > 0 -%}
-      <span class="wb-mapview__marks" aria-hidden="true">
-        {%- for m in marks -%}<i class="wb-mapview__dot" style="left: {{ m.x }}%; top: {{ m.y }}%"></i>{%- endfor -%}
+    {%- if show_marks and marks and marks.size > 0 -%}
+      <span class="wb-mapview__marks{% if show_tip %} wb-mapview__marks--tip{% endif %}" aria-hidden="true">
+        {%- for m in marks -%}
+          {%- if m.label -%}
+            {%- comment -%} 带浮窗文字的：用自绘浮窗，观感与世界地图一致 {%- endcomment -%}
+            <i class="wb-mapview__dot wb-mapview__dot--tip"
+               style="left: {{ m.x }}%; top: {{ m.y }}%"><span class="wb-mapview__tip">{{ m.label }}</span></i>
+          {%- elsif show_tip -%}
+            {%- comment -%} 维护模式：点出图块坐标，方便对照着写覆盖文件 {%- endcomment -%}
+            <i class="wb-mapview__dot" style="left: {{ m.x }}%; top: {{ m.y }}%" title="{{ m.tx }},{{ m.ty }}"></i>
+          {%- else -%}
+            <i class="wb-mapview__dot" style="left: {{ m.x }}%; top: {{ m.y }}%"></i>
+          {%- endif -%}
+        {%- endfor -%}
       </span>
     {%- endif -%}
   </div>
 
   <figcaption class="wb-mapview__cap">
-    <span class="wb-mapview__key" aria-hidden="true"></span>
-    图上共 <b>{{ include.count | default: 0 }}</b> 处事件位置
-    {%- if include.exits and include.exits > 1 -%}
-      ，{{ include.exits }} 个出入口
+    {%- if show_marks -%}
+      <span class="wb-mapview__key" aria-hidden="true"></span>
+      图上共 <b>{{ include.count | default: 0 }}</b> 处事件位置
+      {%- if include.exits and include.exits > 1 -%}
+        ，{{ include.exits }} 个出入口
+      {%- endif -%}
+    {%- else -%}
+      事件打点已关闭（在 <code>_data/site_options.yml</code> 里可以重新打开）
     {%- endif -%}
   </figcaption>
+
+  {%- if marks and marks.size > 0 -%}
+    <details class="wb-note wb-note--tight">
+      <summary>打点坐标对照表（维护用）</summary>
+      <p>
+        下面是本图每个打点的<strong>图块坐标</strong>。要删掉某个点，把对应坐标填进
+        <code>_data/map_overrides.yml</code> 的 <code>remove</code>；
+        要补点就填进 <code>add</code>，然后重新运行
+        <code>python tools/build-maps.py</code>。
+      </p>
+      <p class="wb-coordlist">
+        {%- for m in marks -%}<code>{{ m.tx }},{{ m.ty }}</code>{%- endfor -%}
+      </p>
+    </details>
+  {%- endif -%}
 </figure>

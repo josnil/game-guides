@@ -3,8 +3,12 @@
   数据来源：_data/maps.json（由 tools/build-maps.py 从游戏 data/ 生成）
   交互：悬停浮现地点名；点击进入该地点页面。
   位置用百分比，所以图片怎么缩放，按钮都跟着对齐。
+
+  浮窗开关：_data/site_options.yml 里的 world_map.tooltip
+            （只在显式写成 false 时才关闭；键不存在按 true 处理）
 {%- endcomment -%}
 {%- assign wm = site.data.maps.world -%}
+{%- assign wm_tip = site.data.site_options.world_map.tooltip -%}
 <div class="wb-worldmap">
   <div class="wb-worldmap__stage">
     <img
@@ -22,26 +26,36 @@
            style="left: {{ p.x }}%; top: {{ p.y }}%"
            aria-label="{{ p.title }}">
           <span class="wb-poi__dot" aria-hidden="true"></span>
-          <span class="wb-poi__label">{{ p.title }}</span>
+          {%- if wm_tip != false -%}
+            <span class="wb-poi__label">{{ p.title }}</span>
+          {%- endif -%}
         </a>
       {%- else -%}
         {%- comment -%}
           游戏数据里有传送事件、但地图树里找不到同名地图（例如「火之洞窟内部 2」）。
           保留标记让位置信息完整，但不可点击，并在名牌里说明原因。
+          浮窗关掉时，「不可点击」这个信息会退化成 title 属性，不至于完全丢失。
         {%- endcomment -%}
         <span class="wb-poi wb-poi--off"
               style="left: {{ p.x }}%; top: {{ p.y }}%"
               role="img"
-              aria-label="{{ p.title }}，地图数据未收录">
+              aria-label="{{ p.title }}，地图数据未收录"
+              title="{{ p.title }}（地图数据未收录）">
           <span class="wb-poi__dot" aria-hidden="true"></span>
-          <span class="wb-poi__label">{{ p.title }}<em>地图数据未收录</em></span>
+          {%- if wm_tip != false -%}
+            <span class="wb-poi__label">{{ p.title }}<em>地图数据未收录</em></span>
+          {%- endif -%}
         </span>
       {%- endif -%}
     {%- endfor -%}
   </div>
 
   <p class="wb-worldmap__hint">
-    鼠标移到标记上可以看到地点名，点一下进入该地点的地图。
+    {%- if wm_tip != false -%}
+      鼠标移到标记上可以看到地点名，点一下进入该地点的地图。
+    {%- else -%}
+      点一下标记进入该地点的地图。
+    {%- endif -%}
     窄屏上标记较小，也可以用下面的地点清单或左侧目录进入。
   </p>
 </div>

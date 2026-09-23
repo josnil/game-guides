@@ -78,6 +78,108 @@ def tile_to_pct(tx, ty, width, height):
     return round((tx + 0.5) / width * 100, 4), round((ty + 0.5) / height * 100, 4)
 
 
+def load_overrides(path):
+    """
+    读取 _data/map_overrides.yml —— 地图打点的手动增删与浮窗文字。
+
+    刻意没有引入 PyYAML：为了不给用户增加安装依赖，
+    这里为这个**极其固定的三层结构**写了个小解析器，只认下面这三种写法：
+
+        "42":
+          remove:
+            - "19,28"
+          add:
+            - "5,5"
+          label:
+            "34,18": 商城入口
+
+    其余写法一律报错并指出行号 —— 宁可报错，也不要「写错了却静默不生效」。
+    """
+    if not os.path.exists(path):
+        return {}
+
+    result = {}
+    cur_map = None
+    cur_sec = None
+
+    def new_map(mid):
+        result.setdefault(mid, {"remove": [], "add": [], "label": {}})
+
+    with open(path, "r", encoding="utf-8") as f:
+        for lineno, raw in enumerate(f, 1):
+            line = raw.rstrip("\n")
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            indent = len(line) - len(line.lstrip(" "))
+
+            # 「是段名还是条目」一律看**内容**，不看缩进 ——
+            # 很多人习惯用 4 空格缩进，按缩进硬判会把 `    remove:` 误当成条目。
+            sec = None
+            if stripped.endswith(":"):
+                cand = stripped[:-1].strip().strip('"').strip("'")
+                if cand in ("remove", "add", "label"):
+                    sec = cand
+
+            if indent == 0 and sec is None:
+                if stripped.startswith("-"):
+                    raise ValueError(
+                        f"第 {lineno} 行：条目要缩进在所属段名下面，不能顶格写")
+                if not stripped.endswith(":"):
+                    raise ValueError(f"第 {lineno} 行：地图 id 要写成 `\"42\":` 的形式")
+                cur_map = stripped[:-1].strip().strip('"').strip("'")
+                if not cur_map.isdigit():
+                    raise ValueError(f"第 {lineno} 行：地图 id 必须是数字，收到 `{cur_map}`")
+                new_map(cur_map)
+                cur_sec = None
+                continue
+
+            if sec is not None:
+                if cur_map is None:
+                    raise ValueError(f"第 {lineno} 行：缺少所属的地图 id")
+                cur_sec = sec
+                continue
+
+            # 形如 `del:` 的，多半是段名拼错了，给一句更直白的提示
+            # （浮窗条目形如 `"3,4": 文字`，含逗号，不会被这条拦下）
+            if stripped.endswith(":") and "," not in stripped:
+                bad = stripped[:-1].strip().strip('"').strip("'")
+                raise ValueError(
+                    f"第 {lineno} 行：段名只支持 remove / add / label，收到 `{bad}`")
+
+            if cur_map is None or cur_sec is None:
+                raise ValueError(
+                    f"第 {lineno} 行：这条应属于某个地图的 remove/add/label，"
+                    f"但前面没找到地图 id 或段名")
+
+            if cur_sec == "label":
+                # 形如：  "34,18": 商城入口
+                if ":" not in stripped:
+                    raise ValueError(
+                        f"第 {lineno} 行：浮窗要写成 `\"x,y\": 文字`，收到 `{stripped}`")
+                k, _, v = stripped.partition(":")
+                k = k.strip().strip('"').strip("'")
+                v = v.strip().strip('"').strip("'")
+                if not v:
+                    raise ValueError(f"第 {lineno} 行：冒号后面没有浮窗文字")
+                parts = [t.strip() for t in k.replace("，", ",").split(",")]
+                if len(parts) != 2 or not all(p.lstrip("-").isdigit() for p in parts):
+                    raise ValueError(f"第 {lineno} 行：浮窗的坐标要写成 `x,y`（整数），收到 `{k}`")
+                result[cur_map]["label"][(int(parts[0]), int(parts[1]))] = v
+            else:
+                if not stripped.startswith("-"):
+                    raise ValueError(
+                        f"第 {lineno} 行：坐标条目要以 `-` 开头，例如 `- \"19,28\"`")
+                val = stripped[1:].strip().strip('"').strip("'")
+                # 顺手兼容中文逗号，避免全角输入被判为格式错误
+                parts = [t.strip() for t in val.replace("，", ",").split(",")]
+                if len(parts) != 2 or not all(p.lstrip("-").isdigit() for p in parts):
+                    raise ValueError(f"第 {lineno} 行：坐标要写成 `x,y`（整数），收到 `{val}`")
+                result[cur_map][cur_sec].append((int(parts[0]), int(parts[1])))
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser()
@@ -251,7 +353,20 @@ def main():
     log("  已写 _data/maps.json")
 
     # ---------- 7. 每张地图的事件位置 ----------
+    # 打点默认完全由游戏数据决定；_data/map_overrides.yml 里的手动增删在这里生效，
+    # 所以重新生成不会把手动调整冲掉。
+    overrides_path = os.path.join(REPO, "_data", "map_overrides.yml")
+    try:
+        overrides = load_overrides(overrides_path)
+    except ValueError as e:
+        log("")
+        log(f"✗ _data/map_overrides.yml 格式有误：{e}")
+        log("  修好之后重新运行本脚本即可（其他文件都没动）。")
+        return 1
+
     events_by_map = {}
+    map_meta = {}  # 给本地控制台：每张图的图块尺寸与标题
+    n_removed = n_added = n_labeled = 0
     for p in places:
         mid = p["mapId"]
         if mid is None:
@@ -262,15 +377,76 @@ def main():
         for e in mp.get("events", []):
             if e:
                 tiles.add((e["x"], e["y"]))
+
+        # 覆盖前的原始打点：控制台要靠它才能「撤销删除」，所以必须原样留给前端
+        original_tiles = sorted(tiles)
+
+        ov = overrides.get(str(mid), {})
+        labels = ov.get("label", {})
+
+        for t in ov.get("remove", []):
+            if t in tiles:
+                tiles.discard(t)
+                n_removed += 1
+            else:
+                log(f"  ⚠ 地图 {mid}（{p['title']}）：要删除的打点 {t[0]},{t[1]} 原本就不存在"
+                    f"（游戏数据可能变了，或坐标抄错了）")
+        for t in ov.get("add", []):
+            if not (0 <= t[0] < W and 0 <= t[1] < H):
+                log(f"  ⚠ 地图 {mid}（{p['title']}）：要新增的打点 {t[0]},{t[1]} 超出地图范围"
+                    f"（该图是 {W}x{H} 格），已忽略")
+                continue
+            if t not in tiles:
+                tiles.add(t)
+                n_added += 1
+        for t, text in labels.items():
+            if t not in tiles:
+                log(f"  ⚠ 地图 {mid}（{p['title']}）：给 {t[0]},{t[1]} 写了浮窗「{text}」，"
+                    f"但那个格子没有打点，浮窗不会显示")
+
         marks = []
         for tx, ty in sorted(tiles):
             x, y = tile_to_pct(tx, ty, W, H)
-            marks.append({"x": x, "y": y})
+            # tx/ty 一并写出去：地点页的「打点坐标对照表」与本地控制台都要用
+            m = {"x": x, "y": y, "tx": tx, "ty": ty}
+            if (tx, ty) in labels:
+                m["label"] = labels[(tx, ty)]
+                n_labeled += 1
+            marks.append(m)
         events_by_map[str(mid)] = marks
+        map_meta[str(mid)] = {
+            "w": W,
+            "h": H,
+            "title": p["title"],
+            "image": p.get("image"),
+            "count": len(marks),
+            "original": [[a, b] for a, b in original_tiles],
+            "overrides": {
+                "remove": [[a, b] for a, b in ov.get("remove", [])],
+                "add": [[a, b] for a, b in ov.get("add", [])],
+                "label": {f"{a},{b}": t for (a, b), t in labels.items()},
+            },
+        }
 
     write_json(os.path.join(REPO, "_data", "map_events.json"), events_by_map)
     total_marks = sum(len(v) for v in events_by_map.values())
     log(f"  已写 _data/map_events.json（{len(events_by_map)} 张图，共 {total_marks} 个事件位置）")
+    if n_removed or n_added or n_labeled:
+        log(f"  手动调整已生效：删 {n_removed} 个、补 {n_added} 个、浮窗 {n_labeled} 个"
+            f"（来自 _data/map_overrides.yml）")
+
+    # ---------- 7.5 本地控制台的数据 ----------
+    # 写成 .js 而不是 .json：控制台是双击打开的本地页面（file://），
+    # 那种情况下 fetch/XHR 读 JSON 会被浏览器拦掉，而 <script src> 可以正常加载。
+    console_data = {"maps": map_meta, "events": events_by_map}
+    console_path = os.path.join(REPO, "tools", "map-console-data.js")
+    with open(console_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("// 本文件由 tools/build-maps.py 自动生成，请勿手改（下次生成会覆盖）\n")
+        f.write("// 它只服务于本地控制台 tools/map-console.html。\n")
+        f.write("window.WB_MAP_DATA = ")
+        json.dump(console_data, f, ensure_ascii=False, separators=(",", ":"))
+        f.write(";\n")
+    log(f"  已写 tools/map-console-data.js（本地控制台数据，{len(map_meta)} 张图）")
 
     # ---------- 8. 各地点页面 ----------
     # 页面里的图片宽高来自上一步的压缩结果，所以 --no-images 模式下不碰页面文件

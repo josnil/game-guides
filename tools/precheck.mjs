@@ -476,6 +476,17 @@ if (pets && Array.isArray(pets.items)) {
   for (const it of pets.items) checkNavTarget("_data/pets.yml", it.url);
 }
 
+// 这两个是用户手改的文件。Jekyll 会把 _data/ 下所有文件都解析一遍，
+// 所以它们只要有 YAML 语法错误，整站构建就会失败 —— 在这里先拦下来。
+// （loadData 内部已经会在解析失败时报 E，这里只要触发它。）
+loadData("site_options.yml");
+loadData("map_overrides.yml");
+
+const opts = loadData("site_options.yml");
+if (opts && opts.place_map && opts.place_map.markers === false && opts.world_map === undefined) {
+  W("_data/site_options.yml", "只关了地点页打点，世界地图的开关没写（会用默认值 true）");
+}
+
 // 地图数据由 tools/build-maps.py 生成，容易出现「数据更新了但图片没提交」
 // 或「地图改名后 slug 对不上」这类脱节，所以这里连图片文件一起体检。
 const maps = loadData("maps.json");

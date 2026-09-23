@@ -849,8 +849,12 @@
   max-width: 100%;
   border: 1px solid var(--wb-paper-300);
   border-radius: 12px;
-  // 地图可能比正文宽，超出时横向滚动查看（打点是装饰性绝对定位，不受影响）
-  overflow: auto;
+  // ⚠️ 这里必须是 visible，不能写 overflow:auto。
+  //    auto 会顺便把子元素裁进这个盒子 —— 而打点的悬停浮窗正好在盒子之外，
+  //    会被静默裁掉，症状是「DOM 对、CSS 对、hover 也生效，但浮窗永不出现」。
+  //    图片本身有 max-width:100%，本来就永远不会超出正文栏，所以不需要滚动。
+  //    （世界地图的 .wb-worldmap__stage 同理，那里踩过一次同样的坑。）
+  overflow: visible;
   background-color: var(--wb-paper-200);
   box-shadow: 0 1px 2px rgba(31, 27, 22, 0.06), 0 12px 28px -18px rgba(31, 27, 22, 0.45);
 
@@ -882,6 +886,53 @@
   box-shadow:
     0 0 0 1px rgba(31, 27, 22, 0.5),
     0 0 10px 2px rgba(212, 160, 74, 0.55);
+}
+
+// 带浮窗的打点
+//   marks 容器整体是 pointer-events:none（纯装饰），这里要单独放开，
+//   否则浮窗永远不会出现。
+.wb-mapview__dot--tip {
+  z-index: 3;
+  pointer-events: auto;
+  cursor: help;
+
+  // 圆点只有 14px，直接悬停很难瞄准 —— 用伪元素把命中区扩到约 42px
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -14px;
+    border-radius: 50%;
+  }
+
+  &:hover {
+    z-index: 6; // 压住邻座，浮窗才不会被别的点盖住
+  }
+}
+
+.wb-mapview__tip {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  padding: 0.25rem 0.55rem;
+  transform: translate(-50%, 3px);
+  border: 1px solid rgba(212, 160, 74, 0.55);
+  border-radius: 8px;
+  background-color: rgba(13, 20, 28, 0.94);
+  color: var(--wb-on-ink);
+  font-size: 0.79rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.16s ease,
+    transform 0.2s var(--wb-ease);
+}
+
+.wb-mapview__dot--tip:hover .wb-mapview__tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .wb-mapview__cap {
@@ -933,6 +984,37 @@
     margin: 0.6rem 0 0;
     line-height: 1.7;
   }
+}
+
+// 嵌在图注下方时收紧一点，别把版面撑太开
+.wb-note--tight {
+  margin-top: 0.9rem;
+  font-size: 0.8rem;
+}
+
+// 打点坐标清单：一串等宽小标签，方便一眼扫、也方便整段复制
+.wb-coordlist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+
+  code {
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--wb-paper-300);
+    border-radius: 5px;
+    background-color: var(--wb-paper-200);
+    color: var(--wb-text-dark);
+    font-size: 0.72rem;
+    line-height: 1.6;
+  }
+}
+
+// 打点默认不接收鼠标事件（纯装饰）。
+// 但当 place_map.tooltip 打开时，要让它能触发原生 title 提示，
+// 否则 pointer-events:none 会让提示永远不出现。
+.wb-mapview__marks--tip .wb-mapview__dot {
+  pointer-events: auto;
+  cursor: help;
 }
 
 // ---------- 8.3 侧边栏里的地图模块 ----------
