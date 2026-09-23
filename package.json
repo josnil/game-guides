@@ -5,7 +5,9 @@
   "type": "module",
   "description": "本地预检：在没有 Ruby/Jekyll 的环境下，尽量提前发现 front matter 与配置错误",
   "scripts": {
-    "check": "node tools/precheck.mjs"
+    "check": "node tools/precheck.mjs",
+    "publish": "node tools/publish.mjs",
+    "publish:dry": "node tools/publish.mjs --dry-run"
   },
   "devDependencies": {
     "js-yaml": "^4.1.0"
