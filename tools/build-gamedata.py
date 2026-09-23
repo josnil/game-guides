@@ -130,6 +130,24 @@ def parse_id_list(s):
     return [int(x) for x in re.split(r"[|,，\s]+", s or "") if x.strip().isdigit()]
 
 
+def clean_text(s):
+    """去掉 RPG Maker 文本里的控制码。
+
+    游戏描述里混着这类东西：
+        \\C[20]所有伤害变为暗属性      ← 切换文字颜色
+        \\c[18]自动继承宠物的专属技能
+        前摇\\|后摇                   ← 停顿标记
+    直接输出会在页面上看到「\\C[20]」这种乱码，必须先清掉。
+    """
+    if not s:
+        return ""
+    s = re.sub(r"\\[Cc]\[\d+\]", "", s)          # 颜色
+    s = re.sub(r"\\[VNPI]\[\d+\]", "", s)        # 变量 / 角色名 / 头像等占位
+    s = re.sub(r"\\[|.!><^{}]", "", s)           # 停顿、等待、行首尾控制
+    s = re.sub(r"\\\$", "", s)                   # 显示金钱窗口
+    return s.strip()
+
+
 def load_plugins(js_dir):
     """plugins.js 是 `var $plugins = [...]`；parameters 是字典（不是数组）"""
     txt = open(os.path.join(js_dir, "plugins.js"), "r", encoding="utf-8").read()
@@ -406,7 +424,7 @@ def main():
             "kind": kind,
             "name": item["name"],
             "iconIndex": item.get("iconIndex", 0),
-            "desc": item.get("description") or "",
+            "desc": clean_text(item.get("description")),
             "price": item.get("price", 0),
             "range": rng,
             "dropFrom": drop_index.get((kind, item["id"]), []),
@@ -493,7 +511,7 @@ def main():
             "iconIndex": s.get("iconIndex", 0),
             "stypeId": s.get("stypeId", 0),
             "stype": tn("skillTypes", s.get("stypeId", 0)),
-            "desc": s.get("description") or "",
+            "desc": clean_text(s.get("description")),
             "mpCost": s.get("mpCost", 0),
             "tpCost": s.get("tpCost", 0),
             "formula": dmg.get("formula") or "",
@@ -520,7 +538,7 @@ def main():
         note = s.get("note") or ""
         desc = s.get("description")
         if not desc:
-            desc = note_get(note, "Description", "")
+            desc = clean_text(note_get(note, "Description", ""))
         states.append({
             "id": s["id"],
             "name": s["name"],
@@ -532,6 +550,34 @@ def main():
 
     # ---------- 7. 宠物 ----------
     skills_by_id = {x["id"]: x for x in skills}
+
+    # 魔变装备：宠物备注里的 <DemonicArmor: 464,454> / <DemonicWeapon: 259,260>
+    # 存的是装备 id，这里解析成图标 + 名称 + 功能（游戏的 description 就是效果说明），
+    # 页面上用浮窗展示。
+    equip_by = {}
+    for w in weapons:
+        equip_by[("weapon", w["id"])] = w
+    for a in armors:
+        equip_by[("armor", a["id"])] = a
+
+    def resolve_equips(kind, ids):
+        out = []
+        for i in ids:
+            it = equip_by.get((kind, i))
+            if not it:
+                out.append({"id": i, "kind": kind, "missing": True,
+                            "name": "装备 #%d" % i, "iconIndex": 0, "desc": "", "range": {},
+                            "type": ""})
+                continue
+            out.append({
+                "id": it["id"], "kind": kind, "name": it["name"],
+                "iconIndex": it["iconIndex"], "desc": it["desc"], "range": it["range"],
+                "type": it.get("wtype") or it.get("atype") or "",
+                "twoHanded": bool(it.get("twoHanded")),
+                "set": it.get("set"),
+            })
+        return out
+
     pet_params = (plugins.get("BZ_PetSystem") or {}).get("parameters") or {}
     pet_cfg = {}
     if pet_params.get("petData"):
@@ -564,7 +610,12 @@ def main():
                     out.append({"skillId": sid, "probability": int(o.get("probability") or 0),
                                 "name": sk.get("name") or ("技能 #%d" % sid),
                                 "iconIndex": sk.get("iconIndex", 0),
-                                "stype": sk.get("stype", "")})
+                                "stype": sk.get("stype", ""),
+                                # 浮窗里要展示技能的说明与伤害公式，这里一并带上
+                                "desc": sk.get("desc", ""),
+                                "formula": sk.get("formula", ""),
+                                "mpCost": sk.get("mpCost", 0),
+                                "tpCost": sk.get("tpCost", 0)})
         except Exception:
             pass
         return out
@@ -637,6 +688,11 @@ def main():
             "growth": growth,
             "demonicArmor": parse_id_list(note_get(note, "DemonicArmor", "") or ""),
             "demonicWeapon": parse_id_list(note_get(note, "DemonicWeapon", "") or ""),
+            # 解析后的魔变装备（含图标与功能说明），供页面浮窗使用
+            "demonicArmorItems": resolve_equips(
+                "armor", parse_id_list(note_get(note, "DemonicArmor", "") or "")),
+            "demonicWeaponItems": resolve_equips(
+                "weapon", parse_id_list(note_get(note, "DemonicWeapon", "") or "")),
             "captureFrom": {
                 "enemyId": int(cfg["enemyId"]) if cfg.get("enemyId") else None,
                 "enemy": (enemies_raw[int(cfg["enemyId"])]["name"]
@@ -713,63 +769,141 @@ def main():
         except ImportError:
             log("宠物图像：没装 Pillow，跳过")
 
-    # ---------- 7.6 进化链 ----------
-    # 从「只作为起点、不作为终点」的宠物出发，沿 evolvesTo 走成链。
-    # 多对一的进化（如 17|22|23 → 18）会自然分出多条链路，这符合实际玩法。
+    # ---------- 7.6 进化链（按阶段合并，同阶段的不同形态是分支） ----------
+    # 需求：由同一个初始魔物衍生出的多条链要合并成**一条**完整链；
+    #       同一阶段出现的不同进化型作为该阶段的**分支**。
+    #
+    # 做法（比逐条走路径更贴合需求）：
+    #   1) 把进化关系看成无向图，取连通分量 —— 一个分量就是「同源」的一组宠物
+    #   2) 分量内「不作为任何宠物的进化目标」的宠物即根（初始魔物）
+    #   3) 从根做 BFS，层号 = 到根的最短进化步数 ⇒ 层号就是「阶段」
+    #   4) 每个形态记下自己的「来路」（进化道具、所需等级、联合进化所需宠物）
+    #
+    # 于是 16 →(兽符A) 17|22|23 →(兽符B) 18 会渲染成：
+    #   阶段0: 16      阶段1: 17、22、23（三个分支）      阶段2: 18
+    # 而不是三条各自重复一遍的线性链。
     pets_by_id = {p["id"]: p for p in pets}
-    to_ids = {e["toId"] for e in evolutions}
-    edges = {}
-    for e in evolutions:
-        for f in e["fromIds"]:
-            if f in pets_by_id:
-                edges.setdefault(f, []).append(e)
 
-    def step_of(pid, edge=None):
+    def detail_of(pid):
         p = pets_by_id.get(pid)
         if not p:
             return None
-        s = {"petId": pid, "name": p["name"], "className": p["className"],
-             "sprite": p.get("sprite"), "profile": p["profile"]}
-        if edge:
-            s["itemId"] = edge["itemId"]
-            s["itemName"] = edge["itemName"]
-            s["itemIconIndex"] = edge["itemIconIndex"]
-            s["requireLevel"] = edge["requireLevel"]
-            s["assistIds"] = [i for i in edge["assistIds"] if i in pets_by_id]
-            s["assistNames"] = [pets_by_id[i]["name"] for i in s["assistIds"]]
-        return s
+        return {
+            "petId": pid,
+            "name": p["name"],
+            "className": p["className"],
+            "sprite": p.get("sprite"),
+            "profile": p["profile"],
+            "growth": p["growth"],
+            "demonicExclusiveSkill": p.get("demonicExclusiveSkill"),
+            "demonicSkills": p["demonicSkills"],
+            "mutationSkills": p["mutationSkills"],
+            "demonicArmorItems": p.get("demonicArmorItems") or [],
+            "demonicWeaponItems": p.get("demonicWeaponItems") or [],
+        }
 
-    chains = []
-    seen = set()
+    # 只保留两端都能对上宠物的进化边
+    pet_edges = []
+    for e in evolutions:
+        if e["toId"] not in pets_by_id:
+            continue
+        frm = [f for f in e["fromIds"] if f in pets_by_id]
+        if not frm:
+            continue
+        pet_edges.append({
+            "fromIds": frm, "toId": e["toId"],
+            "itemId": e["itemId"], "itemName": e["itemName"],
+            "itemIconIndex": e["itemIconIndex"], "requireLevel": e["requireLevel"],
+            "assistNames": [pets_by_id[i]["name"] for i in e["assistIds"] if i in pets_by_id],
+        })
 
-    def walk(pid, steps, depth):
-        if depth > 6:
-            return
-        outs = edges.get(pid) or []
-        if not outs:
-            if len(steps) > 1:
-                key = tuple(x["petId"] for x in steps)
-                if key not in seen:
-                    seen.add(key)
-                    chains.append({"steps": list(steps)})
-            return
-        for e in outs:
-            nxt = step_of(e["toId"], e)
-            if nxt:
-                walk(e["toId"], steps + [nxt], depth + 1)
+    adj = {}
+    for e in pet_edges:
+        for f in e["fromIds"]:
+            adj.setdefault(f, set()).add(e["toId"])
+            adj.setdefault(e["toId"], set()).add(f)
 
-    for p in pets:
-        if p["id"] not in to_ids and p["id"] in edges:
-            walk(p["id"], [step_of(p["id"])], 0)
+    groups = []
+    visited = set()
+    for start in sorted(pets_by_id):
+        if start in visited or start not in adj:
+            continue
+        comp, stack = set(), [start]
+        while stack:
+            n = stack.pop()
+            if n in comp:
+                continue
+            comp.add(n)
+            stack.extend(adj.get(n, ()) - comp)
+        visited |= comp
 
-    # 一条链都没参与的宠物（没有进化关系）
+        comp_edges = [e for e in pet_edges
+                      if e["toId"] in comp and any(f in comp for f in e["fromIds"])]
+        incoming = {e["toId"] for e in comp_edges}
+        roots = sorted(n for n in comp if n not in incoming)
+        if not roots:
+            # 理论上不会有环，真遇到就退化为取最小 id，避免整组丢掉
+            roots = [min(comp)]
+
+        level = {r: 0 for r in roots}
+        queue = list(roots)
+        while queue:
+            n = queue.pop(0)
+            for m in sorted(adj.get(n, ())):
+                if m not in level:
+                    level[m] = level[n] + 1
+                    queue.append(m)
+        # 分量内若有 BFS 到不了的节点（数据异常），兜到最后一层，别丢
+        for n in sorted(comp):
+            if n not in level:
+                level[n] = max(level.values(), default=0) + 1
+
+        stages = []
+        for L in range(max(level.values()) + 1):
+            forms = []
+            for n in sorted(k for k, v in level.items() if v == L):
+                det = detail_of(n)
+                if not det:
+                    continue
+                # 来路：所有「上一层 → 本形态」的道具（同名同等级的去重）
+                via, seen_via = [], set()
+                for e in comp_edges:
+                    if e["toId"] != n:
+                        continue
+                    if L == 0 or not any(level.get(f) == L - 1 for f in e["fromIds"]):
+                        continue
+                    key = (e["itemName"], e["requireLevel"])
+                    if key in seen_via:
+                        continue
+                    seen_via.add(key)
+                    via.append({"itemId": e["itemId"], "itemName": e["itemName"],
+                                "itemIconIndex": e["itemIconIndex"],
+                                "requireLevel": e["requireLevel"],
+                                "assistNames": e["assistNames"]})
+                det["via"] = via
+                forms.append(det)
+            if forms:
+                stages.append({"level": L, "forms": forms})
+
+        groups.append({
+            "rootId": roots[0],
+            "rootName": pets_by_id[roots[0]]["name"],
+            "size": len(comp),
+            "depth": max(level.values()),
+            "stages": stages,
+        })
+
     in_chain = set()
-    for c in chains:
-        for s in c["steps"]:
-            in_chain.add(s["petId"])
+    for g in groups:
+        for st in g["stages"]:
+            for f in st["forms"]:
+                in_chain.add(f["petId"])
     standalone = [p["id"] for p in pets if p["id"] not in in_chain]
-    chains.sort(key=lambda c: (-len(c["steps"]), c["steps"][0]["name"]))
-    log(f"进化链：{len(chains)} 条（最长 {max((len(c['steps']) for c in chains), default=0)} 级），"
+    # 深链、大组、有分支的排前面
+    groups.sort(key=lambda g: (-g["depth"], -g["size"], g["rootName"]))
+    branched = sum(1 for g in groups if any(len(s["forms"]) > 1 for s in g["stages"]))
+    log(f"进化链：{len(groups)} 条（最深 {max((g['depth'] for g in groups), default=0)} 级，"
+        f"共 {sum(g['size'] for g in groups)} 只；其中 {branched} 条含分支），"
         f"未参与进化的宠物 {len(standalone)} 只")
 
     # ---------- 8. 图标 ----------
@@ -865,7 +999,7 @@ def main():
     write_json(os.path.join(gd, "states.json"), states)
     write_json(os.path.join(gd, "pets.json"),
                {"pets": pets, "evolutions": evolutions, "skillGroups": skill_groups,
-                "chains": chains, "standalone": standalone})
+                "chainGroups": groups, "standalone": standalone})
     write_json(os.path.join(gd, "meta.json"), meta)
 
     log("")

@@ -1,0 +1,113 @@
+{%- comment -%}
+宠物的浮窗组：魔变专属技能 / 魔变技能 / 魔变装备。
+  用法： {% include gd_pet_pops.html pet=某个宠物对象 %}
+
+  为什么用浮窗而不是直接铺在表格里：技能与装备的说明文字很长，铺开会把表格撑爆；
+  鼠标悬停最省事，触屏点一下也能展开（配合 assets/js/gd-pop.js）。
+
+  ⚠️ 局部变量一律带 wbPp 前缀：Jekyll 的 include 与父页面共享作用域，
+     用通用名会静默覆盖调用页面的变量。
+{%- endcomment -%}
+{%- assign wbPp = include.pet -%}
+<span class="gd-pet__pops">
+
+  {%- comment -%} ---------- 魔变专属技能 ---------- {%- endcomment -%}
+  {%- if wbPp.demonicExclusiveSkill -%}
+    {%- assign wbPpEx = wbPp.demonicExclusiveSkill -%}
+    <span class="gd-pop">
+      <button type="button" class="gd-tag gd-tag--wild gd-pop__btn" aria-expanded="false">
+        魔变专属 · {{ wbPpEx.name }}
+      </button>
+      <span class="gd-pop__panel" role="tooltip">
+        <span class="gd-pop__row">
+          {%- include gd_icon.html idx=wbPpEx.iconIndex small=true label=wbPpEx.name -%}
+          <span class="gd-pop__body">
+            <span class="gd-pop__name">{{ wbPpEx.name }}</span>
+            <span class="gd-pop__meta">
+              {{ wbPpEx.stype | default: '专属技能' }}{% if wbPpEx.mpCost > 0 %} · MP {{ wbPpEx.mpCost }}{% endif %}{% if wbPpEx.tpCost > 0 %} · TP {{ wbPpEx.tpCost }}{% endif %}
+            </span>
+            {%- if wbPpEx.desc != "" -%}<span class="gd-pop__desc">{{ wbPpEx.desc }}</span>{%- endif -%}
+            {%- if wbPpEx.formula != "" -%}<span class="gd-pop__meta">伤害公式：{{ wbPpEx.formula }}</span>{%- endif -%}
+          </span>
+        </span>
+      </span>
+    </span>
+  {%- endif -%}
+
+  {%- comment -%} ---------- 魔变技能（可多条） ---------- {%- endcomment -%}
+  {%- if wbPp.demonicSkills.size > 0 -%}
+    <span class="gd-pop">
+      <button type="button" class="gd-tag gd-tag--set gd-pop__btn" aria-expanded="false">
+        魔变技能 · {{ wbPp.demonicSkills.size }}
+      </button>
+      <span class="gd-pop__panel" role="tooltip">
+        {%- for wbPpSk in wbPp.demonicSkills -%}
+          <span class="gd-pop__row">
+            {%- include gd_icon.html idx=wbPpSk.iconIndex small=true label=wbPpSk.name -%}
+            <span class="gd-pop__body">
+              <span class="gd-pop__name">{{ wbPpSk.name }}</span>
+              <span class="gd-pop__meta">
+                {{ wbPpSk.stype }}{% if wbPpSk.probability < 100 %} · 触发率 {{ wbPpSk.probability }}%{% endif %}{% if wbPpSk.mpCost > 0 %} · MP {{ wbPpSk.mpCost }}{% endif %}
+              </span>
+              {%- if wbPpSk.desc != "" -%}<span class="gd-pop__desc">{{ wbPpSk.desc }}</span>{%- endif -%}
+              {%- if wbPpSk.formula != "" -%}<span class="gd-pop__meta">伤害公式：{{ wbPpSk.formula }}</span>{%- endif -%}
+            </span>
+          </span>
+        {%- endfor -%}
+      </span>
+    </span>
+  {%- endif -%}
+
+  {%- comment -%} ---------- 魔变武器 ---------- {%- endcomment -%}
+  {%- if wbPp.demonicWeaponItems.size > 0 -%}
+    <span class="gd-pop">
+      <button type="button" class="gd-tag gd-pop__btn" aria-expanded="false">
+        魔变武器 · {{ wbPp.demonicWeaponItems.size }}
+      </button>
+      <span class="gd-pop__panel" role="tooltip">
+        {%- for wbPpIt in wbPp.demonicWeaponItems -%}
+          <span class="gd-pop__row">
+            {%- include gd_icon.html idx=wbPpIt.iconIndex small=true label=wbPpIt.name -%}
+            <span class="gd-pop__body">
+              <span class="gd-pop__name">
+                {{ wbPpIt.name }}{% if wbPpIt.twoHanded %} <span class="gd-pop__meta">双手</span>{% endif %}
+              </span>
+              <span class="gd-pop__meta">{{ wbPpIt.type }}{% if wbPpIt.set %} · {{ wbPpIt.set }}{% endif %}</span>
+              {%- if wbPpIt.desc != "" -%}<span class="gd-pop__desc">{{ wbPpIt.desc }}</span>{%- endif -%}
+              {%- if wbPpIt.range.size > 0 -%}
+                <span class="gd-pop__meta">属性：{% include gd_range.html range=wbPpIt.range %}</span>
+              {%- endif -%}
+              {%- if wbPpIt.missing -%}<span class="gd-pop__meta">装备数据里找不到这一件</span>{%- endif -%}
+            </span>
+          </span>
+        {%- endfor -%}
+      </span>
+    </span>
+  {%- endif -%}
+
+  {%- comment -%} ---------- 魔变防具 ---------- {%- endcomment -%}
+  {%- if wbPp.demonicArmorItems.size > 0 -%}
+    <span class="gd-pop">
+      <button type="button" class="gd-tag gd-pop__btn" aria-expanded="false">
+        魔变防具 · {{ wbPp.demonicArmorItems.size }}
+      </button>
+      <span class="gd-pop__panel" role="tooltip">
+        {%- for wbPpIt in wbPp.demonicArmorItems -%}
+          <span class="gd-pop__row">
+            {%- include gd_icon.html idx=wbPpIt.iconIndex small=true label=wbPpIt.name -%}
+            <span class="gd-pop__body">
+              <span class="gd-pop__name">{{ wbPpIt.name }}</span>
+              <span class="gd-pop__meta">{{ wbPpIt.type }}{% if wbPpIt.set %} · {{ wbPpIt.set }}{% endif %}</span>
+              {%- if wbPpIt.desc != "" -%}<span class="gd-pop__desc">{{ wbPpIt.desc }}</span>{%- endif -%}
+              {%- if wbPpIt.range.size > 0 -%}
+                <span class="gd-pop__meta">属性：{% include gd_range.html range=wbPpIt.range %}</span>
+              {%- endif -%}
+              {%- if wbPpIt.missing -%}<span class="gd-pop__meta">装备数据里找不到这一件</span>{%- endif -%}
+            </span>
+          </span>
+        {%- endfor -%}
+      </span>
+    </span>
+  {%- endif -%}
+
+</span>

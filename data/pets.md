@@ -4,98 +4,93 @@ layout: default
 permalink: /data/pets/
 ---
 
-{%- assign data = site.data.gamedata.pets -%}
-{%- assign pets = data.pets -%}
-{%- assign chains = data.chains -%}
-{%- assign standalone = data.standalone -%}
+{%- assign wbPetData = site.data.gamedata.pets -%}
+{%- assign wbPets = wbPetData.pets -%}
+{%- assign wbGroups = wbPetData.chainGroups -%}
+{%- assign wbStandalone = wbPetData.standalone -%}
+{%- assign wbBranchy = 0 -%}
+{%- for wbG in wbGroups -%}
+  {%- for wbSt in wbG.stages -%}
+    {%- if wbSt.forms.size > 1 -%}{%- assign wbBranchy = wbBranchy | plus: 1 -%}{%- break -%}{%- endif -%}
+  {%- endfor -%}
+{%- endfor -%}
 
 # 宠物
+
 {% include gd_subnav.html active="pets" %}
 
+共 **{{ wbPets.size }}** 只，形成 **{{ wbGroups.size }}** 条进化链（其中 {{ wbBranchy }} 条含分支）。
 
-共 **{{ pets.size }}** 只，形成 **{{ chains.size }}** 条进化链（最长 {{ chains.first.steps.size }} 级）。
-
-<div class="gd-kv">
-  <span>捕获方式：<b>击败对应敌人后概率捕获</b>，也可以用兽符进化</span>
-  <span>进化所需等级写在进化道具上</span>
-</div>
+同一个初始形态衍生出的多形态已经**合并为一条链**；同一阶段出现的不同进化型，作为该阶段的**分支**并列展示。
 
 ---
 
 ## 进化链
 
-{%- for c in chains %}
+{%- for wbG in wbGroups %}
+{%- assign wbHasBranch = false -%}
+{%- for wbSt in wbG.stages -%}
+  {%- if wbSt.forms.size > 1 -%}{%- assign wbHasBranch = true -%}{%- endif -%}
+{%- endfor -%}
 <section class="gd-chain">
-  <div class="gd-chain__steps">
-    {%- for step in c.steps -%}
-      {%- assign pet = pets | where: 'id', step.petId | first -%}
-
-      {%- comment -%}
-        第一级之前没有「进化需求」，所以只在非首级前面插箭头。
-      {%- endcomment -%}
-      {%- if step.itemName -%}
-        <span class="gd-chain__arrow">
-          {%- include gd_icon.html idx=step.itemIconIndex small=true label=step.itemName -%}
-          <span>{{ step.itemName }}</span>
-          {%- if step.requireLevel and step.requireLevel > 0 -%}
-            <span>{{ step.requireLevel }} 级</span>
-          {%- endif -%}
-          {%- if step.assistNames.size > 0 -%}
-            <span>需 {{ step.assistNames | join: '、' }}</span>
-          {%- endif -%}
-        </span>
-      {%- endif -%}
-
-      <span class="gd-pet">
-        {%- if step.sprite -%}
-          <img src="{{ step.sprite | relative_url }}" width="48" height="48" alt="" style="image-rendering: pixelated">
-        {%- endif -%}
-        <span>
-          <b>{{ step.name }}</b>
-          {%- if step.className -%}<br><span class="gd-range">{{ step.className }}</span>{%- endif -%}
-        </span>
-      </span>
-    {%- endfor -%}
+  <div class="gd-chain__title">
+    <span class="gd-chain__name">{{ wbG.rootName }}</span>
+    <span class="gd-chain__count">
+      {{ wbG.depth }} 级进化 · 共 {{ wbG.size }} 种形态
+      {%- if wbHasBranch %} · 含分支{% endif -%}
+    </span>
   </div>
 
-  {%- comment -%}
-    链上每一级的细节（成长、专属技能、魔变技能）放在下面按级列出，
-    免得把卡片挤爆。只显示有内容的项。
-  {%- endcomment -%}
-  {%- for step in c.steps -%}
-    {%- assign pet = pets | where: 'id', step.petId | first -%}
-    {%- if pet -%}
-      {%- assign hasInfo = false -%}
-      {%- if pet.growth.size > 0 or pet.demonicSkills.size > 0 or pet.demonicExclusiveSkill or pet.captureFrom.enemy -%}
-        {%- assign hasInfo = true -%}
-      {%- endif -%}
-      {%- if hasInfo -%}
-        <div class="gd-kv">
-          <span><b>{{ pet.name }}</b></span>
-          {%- if pet.captureFrom.enemy -%}
-            <span>捕获自：<b>{{ pet.captureFrom.enemy }}</b>{% if pet.captureFrom.difficulty %}（难度 {{ pet.captureFrom.difficulty }}）{% endif %}</span>
-          {%- endif -%}
-          {%- if pet.growth.size > 0 -%}
-            <span>成长：
-              {%- for pair in pet.growth -%}
-                {{ pair[1].cn }} +{{ pair[1].value }}{% unless forloop.last %}、{% endunless %}
-              {%- endfor -%}
+  {%- for wbSt in wbG.stages %}
+    <div class="gd-chain__stage">
+      <span class="gd-chain__level">{{ wbSt.level }} 阶</span>
+      <div class="gd-chain__forms">
+        {%- for wbF in wbSt.forms %}
+          <div class="gd-chain__branch">
+            {%- comment -%}
+              来路：第 0 阶没有；其余每支显示自己用的进化道具与所需等级。
+              联合进化还会列出需要带在身边的辅助宠物。
+            {%- endcomment -%}
+            {%- for wbV in wbF.via -%}
+              <span class="gd-chain__via">
+                {%- include gd_icon.html idx=wbV.itemIconIndex small=true label=wbV.itemName -%}
+                <span class="gd-chain__via-name">{{ wbV.itemName }}</span>
+                {%- if wbV.requireLevel and wbV.requireLevel > 0 -%}
+                  <span>{{ wbV.requireLevel }} 级</span>
+                {%- endif -%}
+                {%- if wbV.assistNames.size > 0 -%}
+                  <span>需 {{ wbV.assistNames | join: '、' }}</span>
+                {%- endif -%}
+              </span>
+            {%- endfor -%}
+
+            <span class="gd-pet">
+              {%- if wbF.sprite -%}
+                <img src="{{ wbF.sprite | relative_url }}" width="48" height="48" alt=""
+                     style="image-rendering: pixelated">
+              {%- endif -%}
+              <span>
+                <b>{{ wbF.name }}</b>
+                {%- if wbF.className -%}<br><span class="gd-range">{{ wbF.className }}</span>{%- endif -%}
+              </span>
             </span>
-          {%- endif -%}
-          {%- if pet.demonicExclusiveSkill -%}
-            <span>魔变专属技能：<b>{{ pet.demonicExclusiveSkill.name }}</b></span>
-          {%- endif -%}
-          {%- if pet.demonicSkills.size > 0 -%}
-            <span>魔变技能：
-              {%- for sk in pet.demonicSkills -%}
-                {{ sk.name }}{% if sk.probability and sk.probability < 100 %}（{{ sk.probability }}%）{% endif %}{% unless forloop.last %}、{% endunless %}
-              {%- endfor -%}
-            </span>
-          {%- endif -%}
-        </div>
-      {%- endif -%}
-    {%- endif -%}
-  {%- endfor -%}
+
+            {%- if wbF.growth.size > 0 -%}
+              <span class="gd-pet__meta">
+                <span>成长
+                  {%- for wbPair in wbF.growth -%}
+                    {{ wbPair[1].cn }}+{{ wbPair[1].value }}{% unless forloop.last %} {% endunless %}
+                  {%- endfor -%}
+                </span>
+              </span>
+            {%- endif -%}
+
+            {%- include gd_pet_pops.html pet=wbF -%}
+          </div>
+        {%- endfor -%}
+      </div>
+    </div>
+  {%- endfor %}
 </section>
 {%- endfor %}
 
@@ -103,7 +98,8 @@ permalink: /data/pets/
 
 ## 全部宠物
 
-未参与进化链的宠物 {{ standalone.size }} 只也在下表里。
+未参与进化链的 {{ wbStandalone.size }} 只也在下表。**魔变技能与魔变装备**收在浮窗里 ——
+鼠标悬停，或点一下标签即可展开。
 
 <div data-gd-table>
   <div class="gd-toolbar">
@@ -119,63 +115,46 @@ permalink: /data/pets/
         <tr>
           <th scope="col">宠物</th>
           <th scope="col">阶级</th>
-          <th scope="col">捕获来源</th>
           <th scope="col">成长</th>
           <th scope="col">进化</th>
-          <th scope="col">魔变技能</th>
+          <th scope="col">魔变</th>
         </tr>
       </thead>
       <tbody>
-      {%- for p in pets -%}
-        <tr id="gd-pet-{{ p.id }}" data-name="{{ p.name }} {{ p.className }} {% if p.captureFrom.enemy %}{{ p.captureFrom.enemy }}{% endif %}">
+      {%- for wbP in wbPets -%}
+        <tr id="gd-pet-{{ wbP.id }}" data-name="{{ wbP.name }} {{ wbP.className }}">
           <td>
             <span class="gd-name">
-              {%- if p.sprite -%}
-                <img src="{{ p.sprite | relative_url }}" width="32" height="32" alt="" style="image-rendering: pixelated">
+              {%- if wbP.sprite -%}
+                <img src="{{ wbP.sprite | relative_url }}" width="32" height="32" alt=""
+                     style="image-rendering: pixelated">
               {%- endif -%}
-              <span>{{ p.name }}</span>
+              <span>{{ wbP.name }}</span>
             </span>
           </td>
-          <td>{{ p.className }}</td>
+          <td>{{ wbP.className }}</td>
           <td class="gd-range">
-            {%- if p.captureFrom.enemy -%}
-              {{ p.captureFrom.enemy }}{% if p.captureFrom.difficulty %} · 难度 {{ p.captureFrom.difficulty }}{% endif %}
-            {%- else -%}
-              —
-            {%- endif -%}
-          </td>
-          <td class="gd-range">
-            {%- if p.growth.size > 0 -%}
-              {%- for pair in p.growth -%}
-                {{ pair[1].cn }} +{{ pair[1].value }}{% unless forloop.last %}、{% endunless %}
+            {%- if wbP.growth.size > 0 -%}
+              {%- for wbPair in wbP.growth -%}
+                {{ wbPair[1].cn }} +{{ wbPair[1].value }}{% unless forloop.last %}、{% endunless %}
               {%- endfor -%}
             {%- else -%}
               —
             {%- endif -%}
           </td>
           <td class="gd-range">
-            {%- if p.evolvesTo.size > 0 -%}
-              {%- for e in p.evolvesTo -%}
-                经「{{ e.item }}」{% if e.requireLevel and e.requireLevel > 0 %}（{{ e.requireLevel }} 级）{% endif %}
-                → {{ pets | where: 'id', e.toId | map: 'name' | first }}{% unless forloop.last %}；{% endunless %}
+            {%- if wbP.evolvesTo.size > 0 -%}
+              {%- for wbE in wbP.evolvesTo -%}
+                经「{{ wbE.item }}」{% if wbE.requireLevel and wbE.requireLevel > 0 %}（{{ wbE.requireLevel }} 级）{% endif %}
+                → {{ wbPets | where: 'id', wbE.toId | map: 'name' | first }}{% unless forloop.last %}；{% endunless %}
               {%- endfor -%}
-            {%- elsif p.evolvesFrom.size > 0 -%}
+            {%- elsif wbP.evolvesFrom.size > 0 -%}
               终态
             {%- else -%}
               无
             {%- endif -%}
           </td>
-          <td class="gd-range">
-            {%- if p.demonicExclusiveSkill -%}
-              <span class="gd-tag gd-tag--set">专属 · {{ p.demonicExclusiveSkill.name }}</span>
-            {%- endif -%}
-            {%- for sk in p.demonicSkills -%}
-              <span class="gd-tag">{{ sk.name }}</span>
-            {%- endfor -%}
-            {%- if p.demonicSkills.size == 0 -%}
-              {%- unless p.demonicExclusiveSkill -%}—{%- endunless -%}
-            {%- endif -%}
-          </td>
+          <td>{% include gd_pet_pops.html pet=wbP %}</td>
         </tr>
       {%- endfor -%}
       </tbody>
@@ -187,13 +166,12 @@ permalink: /data/pets/
   <summary>这些数据是怎么来的</summary>
   <p>
     宠物是游戏里的「角色」，靠备注标记 <code>&lt;MKPet&gt;</code> 识别；
-    捕获来源、难度、变异与魔变技能来自宠物系统插件的配置；
     进化关系写在<strong>进化道具</strong>（兽符）上：
     <code>&lt;PetEvolve: 进化前, 进化后&gt;</code> 与 <code>&lt;RequireLevel: 等级&gt;</code>，
-    联合进化还需要额外的辅助宠物。
+    联合进化还需要额外的辅助宠物。魔变技能与魔变装备来自宠物系统配置与宠物备注。
   </p>
   <p>
-    宠物头像从游戏的行走图里取——宠物没有图标索引，形象存在角色行走图中，
-    取朝下站立的那一帧。
+    宠物头像从游戏的<strong>行走图</strong>里取（宠物没有图标索引），
+    取朝下站立的那一帧；取不到行走图的宠物就不显示头像。
   </p>
 </details>
