@@ -739,16 +739,27 @@ const pageFiles = walk(ROOT).filter(
 );
 let mergeHits = 0;
 for (const f of pageFiles) {
-  // 预处理：把注释块替换成占位标记，并**保留「它的开标签是不是左裁剪标签」这一信息**。
-  // （上一版直接把注释删掉，结果注释自己吃掉空行的情况被漏判了 ——
-  //   而注释块的开标签恰恰也是最常见的罪魁：{%- comment -%}。）
-  const src = fs.readFileSync(f, "utf8").replace(
+  // 预处理分两步：
+  //   1) 剥掉 front matter。Jekyll 在处理 Markdown 之前就把它去掉了，
+  //      所以它的结束标记「---」不是分隔线，不参与合并判断。
+  //      （不剥的话每个页面都会被误报一次。）
+  //   2) 把注释块替换成占位标记，并**保留「它的开标签是不是左裁剪标签」这一信息**。
+  //      （上一版直接把注释删掉，结果注释自己吃掉空行的情况被漏判了 ——
+  //        而注释块的开标签恰恰也是最常见的罪魁：{%- comment -%}。）
+  const raw = fs.readFileSync(f, "utf8");
+  const body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+  const src = body.replace(
     /{%(-?)\s*comment\s*-?%}[\s\S]*?{%-?\s*endcomment\s*-?%}/g,
     (_m, dash) => (dash === "-" ? "@@EATER@@" : "@@COMMENT@@")
   );
   const lines = src.split(/\r?\n/);
   for (let i = 0; i < lines.length - 2; i++) {
-    if (!/^#{1,6}\s+\S/.test(lines[i])) continue;      // 标题行
+    // 「块起始行」：Markdown 标题，或分隔线（--- / *** / ___）
+    // 分隔线也要查：三个减号与下一行标题粘成一行时，Kramdown 会把减号当排版符号
+    // 转成破折号，页面上会出现一个「—## 标题」这样的段落（我踩过）。
+    const isBlockLine =
+      /^#{1,6}\s+\S/.test(lines[i]) || /^(-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i]);
+    if (!isBlockLine) continue;
     if (lines[i + 1].trim() !== "") continue;           // 需要紧跟一个空行
     let j = i + 1;
     let eater = false;
@@ -761,11 +772,13 @@ for (const f of pageFiles) {
       if (/^\s*{%/.test(L)) { j++; continue; }                       // 普通标签：换行会保留
       break;
     }
-    if (eater && j < lines.length && /^\s*</.test(lines[j])) {
-      E(rel(f), `第 ${i + 1} 行：标题「${lines[i].trim()}」与第 ${j + 1} 行的 HTML 之间夹着` +
-        `左裁剪标签（{%- …），它会吃掉标题后的空行，两者被并成一段 ——` +
-        `标题里混进 HTML，后面的缩进内容会被整段当成代码块转义。` +
-        `改法：把注释挪到标题之前，并用 <div markdown="0"> 包住这段 HTML。`);
+    // 只要空行被吃掉，这一块就会和下面的内容粘在一起 ——
+    // 无论是 HTML（被转义）还是普通 Markdown 文字（并进标题/段落），都是错的。
+    if (eater && j < lines.length) {
+      E(rel(f), `第 ${i + 1} 行的「${lines[i].trim()}」与第 ${j + 1} 行的内容之间夹着` +
+        `左裁剪标签（{%- …），它会把两者之间的空行吃掉，两块粘成一段：` +
+        `标题会吸收后面的文字/HTML，分隔线会变成破折号。` +
+        `改法：把注释挪到文件顶部；要保留的 HTML 段落用 <div markdown="0"> 包起来。`);
       mergeHits++;
     }
   }
