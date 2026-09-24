@@ -831,6 +831,44 @@ if (commentTagIssues === 0) {
 }
 
 // ============================================================
+// 浮窗技能对象的字段是否整齐
+// ------------------------------------------------------------
+// 宠物浮窗里要展示技能的说明与效果。曾经「魔变专属技能」是用一行 lambda
+// 单独拼出来的，只带了名称和图标 —— 结果浮窗里没有描述，而且不报任何错
+// （普通魔变技能有描述、专属技能没有，肉眼要逐条点开才看得出）。
+// 这里断言：所有用在浮窗里的技能对象，字段集合必须一致。
+// ============================================================
+const SHARED_SKILL_KEYS = [
+  "desc", "detail", "formula", "iconIndex", "mpCost", "name", "skillId", "stype", "tpCost",
+];
+const petsData2 = loadData("gamedata/pets.json");
+if (petsData2 && Array.isArray(petsData2.pets)) {
+  let shapeIssues = 0;
+  const badShape = [];
+  for (const p of petsData2.pets) {
+    const list = [];
+    if (p.demonicExclusiveSkill) list.push(["魔变专属技能", p.demonicExclusiveSkill]);
+    for (const s of p.demonicSkills || []) list.push(["魔变技能", s]);
+    for (const [label, sk] of list) {
+      const missing = SHARED_SKILL_KEYS.filter((k) => !(k in sk));
+      if (missing.length) {
+        shapeIssues++;
+        if (badShape.length < 3) {
+          badShape.push(`${p.name} 的${label}「${sk.name}」缺字段 ${missing.join("/")}`);
+        }
+      }
+    }
+  }
+  if (shapeIssues) {
+    E("_data/gamedata/pets.json",
+      `有 ${shapeIssues} 个技能对象字段不齐（${badShape.join("；")}）—— ` +
+      `浮窗会缺内容且不报错。请确认所有技能都走同一个解析函数。`);
+  } else {
+    console.log("  · 浮窗技能字段：已核对，字段整齐");
+  }
+}
+
+// ============================================================
 // 7. 其他
 // ============================================================
 if (fs.existsSync(path.join(ROOT, "CNAME"))) {

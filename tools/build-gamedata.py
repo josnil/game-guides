@@ -602,6 +602,27 @@ def main():
             log(f"⚠ 技能组解析失败：{ex}")
     log(f"宠物配置：{len(pet_cfg)} 条，技能组 {len(skill_groups)} 组")
 
+    def skill_detail(sid):
+        """把技能 id 解析成浮窗要用的完整字段。
+
+        ⚠️ 技能说明要读备注里的 <Description> / <DamageInfo>，不能读 description 字段
+        （那字段几乎都是空的）。这里统一处理，免得某个调用点漏掉 ——
+        魔变专属技能最初就是用一行 lambda 单独拼的，只带了名称和图标，
+        结果浮窗里没有描述。
+        """
+        sk = skills_by_id.get(sid) or {}
+        return {
+            "skillId": sid,
+            "name": sk.get("name") or ("技能 #%d" % sid),
+            "iconIndex": sk.get("iconIndex", 0),
+            "stype": sk.get("stype", ""),
+            "desc": sk.get("desc", ""),
+            "detail": sk.get("detail", ""),
+            "formula": sk.get("formula", ""),
+            "mpCost": sk.get("mpCost", 0),
+            "tpCost": sk.get("tpCost", 0),
+        }
+
     def skills_of(raw_list):
         out = []
         if not raw_list:
@@ -611,17 +632,9 @@ def main():
                 o = json.loads(s)
                 sid = int(o.get("skillId") or 0)
                 if sid > 0:
-                    sk = skills_by_id.get(sid) or {}
-                    out.append({"skillId": sid, "probability": int(o.get("probability") or 0),
-                                "name": sk.get("name") or ("技能 #%d" % sid),
-                                "iconIndex": sk.get("iconIndex", 0),
-                                "stype": sk.get("stype", ""),
-                                # 浮窗里要展示技能的说明与伤害公式，这里一并带上
-                                "desc": sk.get("desc", ""),
-                                "detail": sk.get("detail", ""),
-                                "formula": sk.get("formula", ""),
-                                "mpCost": sk.get("mpCost", 0),
-                                "tpCost": sk.get("tpCost", 0)})
+                    item = skill_detail(sid)
+                    item["probability"] = int(o.get("probability") or 0)
+                    out.append(item)
         except Exception:
             pass
         return out
@@ -714,7 +727,9 @@ def main():
             "mutationSkills": skills_of(cfg.get("mutationSkills")),
             "demonicSkills": skills_of(cfg.get("demonicSkills")),
             "demonicExclusiveSkillId": int(cfg.get("demonicExclusiveSkillId") or 0),
-            "demonicExclusiveSkill": (lambda sid: ({"skillId": sid, "name": (skills_by_id.get(sid) or {}).get("name") or ("技能 #%d" % sid), "iconIndex": (skills_by_id.get(sid) or {}).get("iconIndex", 0), "stype": (skills_by_id.get(sid) or {}).get("stype", "")}) if sid > 0 else None)(int(cfg.get("demonicExclusiveSkillId") or 0)),
+            # 专属技能也要走统一的解析（含描述与效果），别单独拼字段
+            "demonicExclusiveSkill": (skill_detail(int(cfg.get("demonicExclusiveSkillId") or 0))
+                                     if int(cfg.get("demonicExclusiveSkillId") or 0) > 0 else None),
             "skillGroups": group_names(cfg.get("skillGroups")),
             "mutationGroups": group_names(cfg.get("mutationGroups")),
             "demonicGroups": group_names(cfg.get("demonicGroups")),
