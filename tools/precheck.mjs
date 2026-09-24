@@ -772,6 +772,51 @@ for (const f of pageFiles) {
 if (mergeHits === 0) console.log("  · 标题与 HTML：没有会被并段的写法");
 
 // ============================================================
+// 注释块里的 Liquid 标签
+// ------------------------------------------------------------
+// ⚠️ Liquid 会解析 {% comment %} 块**内部**的标签（只是不渲染结果）。
+//    所以注释里写标签示例，语法必须完全合法 ——
+//    哪怕只是写个省略号当占位（标签名是「...」），都会让整站构建失败，
+//    而报错位置指向"使用该模板的页面"，极难倒查。
+// 实测踩过两次：
+//   1) 注释里写 include 示例，参数用了中文占位符 → 参数校验失败
+//   2) 注释里写 `{%- ... %}` 说明左裁剪 → 标签名非法
+// ⇒ 规矩：注释里只写文字描述，不写带百分号的标签；确要写就必须是合法标签 + 合法参数。
+// ============================================================
+const KNOWN_TAGS = new Set([
+  "assign", "capture", "case", "when", "comment", "endcomment", "cycle",
+  "decrement", "increment", "echo", "else", "elsif", "for", "break", "continue",
+  "endfor", "if", "endif", "ifchanged", "unless", "endunless", "raw", "endraw",
+  "include", "include_relative", "include_cached", "render", "layout", "liquid",
+  "tablerow", "endtablerow", "link", "post_url", "highlight", "endhighlight",
+  "seo", "schema", "tab", "endtab",
+]);
+let commentTagIssues = 0;
+for (const f of includeTargets) {
+  const relPath = rel(f);
+  if (relPath === "README.md") continue;
+  const src = fs.readFileSync(f, "utf8");
+  const re = /{%-?\s*comment\s*-?%}([\s\S]*?){%-?\s*endcomment\s*-?%}/g;
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    const inner = m[1];
+    for (const t of inner.matchAll(/{%-?\s*([^%}]*?)\s*-?%}/g)) {
+      const name = (t[1].trim().split(/\s+/)[0] || "").trim();
+      if (!KNOWN_TAGS.has(name)) {
+        const line = src.slice(0, m.index + m[0].indexOf(inner) + t.index).split("\n").length;
+        E(relPath, `第 ${line} 行：注释块里出现了 Liquid 标签 { % ${name || "(空)"} % }，` +
+          `而「${name || "(空)"}」不是合法标签名。注释里的标签同样会被 Liquid 解析，` +
+          `会让整站构建失败。请改成纯文字描述。`);
+        commentTagIssues++;
+      }
+    }
+  }
+}
+if (commentTagIssues === 0) {
+  console.log("  · 注释内标签：已检查，没有非法标签名");
+}
+
+// ============================================================
 // 7. 其他
 // ============================================================
 if (fs.existsSync(path.join(ROOT, "CNAME"))) {
