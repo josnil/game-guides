@@ -1354,6 +1354,22 @@
   max-width: 17rem;
 }
 
+// 宠物头像。源图尺寸不统一（行走图格子有 48px，也有 120px），
+// 所以用「限定外框 + 等比缩放」，并且**不要**用 image-rendering: pixelated ——
+// 放大会糊、缩小会出锯齿。注意源图比例不一定正方（如 80×69），
+// object-fit: contain 能保证不失真。
+.gd-pet__img {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.gd-pet__img--sm {
+  width: 32px;
+  height: 32px;
+}
+
 .gd-chain__steps {
   display: flex;
   flex-wrap: wrap;

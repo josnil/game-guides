@@ -699,6 +699,11 @@ def main():
                           if cfg.get("enemyId") and int(cfg["enemyId"]) < len(enemies_raw)
                           and enemies_raw[int(cfg["enemyId"])] else None),
                 "difficulty": int(cfg.get("captureDifficulty") or 0) if cfg.get("captureDifficulty") else None,
+                # 头像用的就是「要捕获的那只怪」的立绘文件名（见 7.5 的说明）
+                "enemyBattlerName": (lambda eid: (
+                    (enemies_raw[eid - 1] or {}).get("battlerName")
+                    if 0 < eid <= len(enemies_raw) and enemies_raw[eid - 1] else None)
+                )(int(cfg["enemyId"]) if cfg.get("enemyId") else 0),
             },
             "mutationSkills": skills_of(cfg.get("mutationSkills")),
             "demonicSkills": skills_of(cfg.get("demonicSkills")),
@@ -714,23 +719,38 @@ def main():
         })
     log(f"宠物：{len(pets)} 只（其中 {sum(1 for p in pets if p['evolvesTo'])} 只有进化去向）")
 
-    # ---------- 7.5 宠物图像 ----------
-    # 宠物是「角色」不是「物品」，所以没有 iconIndex 可用。
-    # 它们的形象在 img/characters 的行走图里（同样是 RPGMV 加密）：
-    #   文件名以 $ 开头 → 整张图只有 1 个角色，3 列 × 4 行
-    #   否则            → 4 列 × 2 行，共 8 个角色，由 characterIndex 选择
-    # 每格 48×48。这里取「左下角那帧」（面朝下的站立姿势）作为头像。
-    CHAR_CELL = 48
+    # ---------- 7.5 宠物头像 ----------
+    # 宠物没有专门的图标字段，只能借别的图。四种候选实测对比：
+    #     characterName → img/characters  行走图   7 种 / 106 只  ← 选它
+    #     faceName      → img/faces       头像     5 种 / 106 只（全是人形立绘，不像怪）
+    #     battlerName   → img/sv_actors   我方战斗图 6 种 / 106 只（全是人类角色）
+    #     enemyId       → img/sv_enemies  敌人立绘   9 种 / 107 只（覆盖最全，但约七成
+    #                                                  都指向同一张 Slime，一只蓝史莱姆）
+    # 只有行走图显示的是**怪物形态**，所以选它。
+    #
+    # ⚠️ 行走图裁帧有两个坑：
+    #   1) **格子尺寸不是固定的 48px**：$BigMonster* 是 360x480（格子 120px），
+    #      其它是 576x384（格子 48px）。要按图本身算：
+    #          $ 开头的图 = 1 个角色，格子 = 宽/3
+    #          其它图      = 4×2 个角色，格子 = 宽/12
+    #      我一开始硬编码 48，结果每张头像都是角色之间的空隙碎片。
+    #   2) 布局是「每个角色 3 列 × 4 行」——列是三帧行走动画、行是朝向
+    #      （0 朝下 / 1 朝左 / 2 朝右 / 3 朝上）。取「朝下 + 站立」= 列偏移 +1、行偏移 +0。
+    #
+    # 部分宠物共用同一张行走图（游戏数据如此），头像会重复 ——
+    # 页面上如实说明，不放占位图、不伪造。
     key_hex = system.get("encryptionKey")
     char_dir = os.path.join(game, "img", "characters")
     pet_img_dir = os.path.join(REPO, "assets", "gamedata", "pets")
     n_img = 0
+    n_missing = 0
+    src_names = set()
     if key_hex and os.path.isdir(char_dir) and not args.no_icons:
         try:
             from PIL import Image
             import io
             os.makedirs(pet_img_dir, exist_ok=True)
-            for f in os.listdir(pet_img_dir):  # 清掉旧图，避免改名后残留
+            for f in os.listdir(pet_img_dir):      # 清掉旧图，避免改名后残留
                 if f.endswith(".png"):
                     os.remove(os.path.join(pet_img_dir, f))
             for p in pets:
@@ -738,36 +758,43 @@ def main():
                 cn = a.get("characterName")
                 ci = a.get("characterIndex") or 0
                 if not cn:
+                    n_missing += 1
                     continue
                 src = os.path.join(char_dir, cn + ".png_")
                 if not os.path.exists(src):
+                    n_missing += 1
                     continue
                 png = decrypt_rpgmv(src, key_hex)
                 if not png or png[:8] != b"\x89PNG\r\n\x1a\n":
+                    n_missing += 1
                     continue
                 im = Image.open(io.BytesIO(png)).convert("RGBA")
                 W, H = im.size
                 if cn.startswith("$"):
-                    cols, rows = W // CHAR_CELL, H // CHAR_CELL
-                    col, row = 0, min(rows - 1, 2)  # 第 3 行 = 朝下站立
+                    gx, gy, cell = 0, 0, W // 3
                 else:
-                    cols, rows = W // CHAR_CELL, H // CHAR_CELL
-                    col = ci % 4
-                    row = min(rows - 1, 1 + (ci // 4) * 2 + 1)  # 每个角色占 2 行，取下半
-                    row = min(row, rows - 1)
-                if cols < 1 or rows < 1:
+                    gx, gy, cell = ci % 4, ci // 4, W // 12
+                if cell < 8:
+                    n_missing += 1
                     continue
-                box = (col * CHAR_CELL, row * CHAR_CELL, (col + 1) * CHAR_CELL, (row + 1) * CHAR_CELL)
+                box = ((gx * 3 + 1) * cell, (gy * 4 + 0) * cell,
+                       (gx * 3 + 2) * cell, (gy * 4 + 1) * cell)
                 frame = im.crop(box)
                 out = os.path.join(pet_img_dir, "%d.png" % p["id"])
-                frame.save(out, "PNG", optimize=True)
+                # ⚠️ 量化前**不能** convert("RGB")：会丢掉 alpha，
+                #    透明背景变成不透明近白色，图标在浅色背景上"隐形"且不报错。
+                #    FASTOCTREE 支持带 alpha 的调色板量化，体积也更小。
+                frame.quantize(colors=256, method=Image.FASTOCTREE).save(
+                    out, "PNG", optimize=True)
                 p["sprite"] = "/assets/gamedata/pets/%d.png" % p["id"]
+                src_names.add(cn)
                 n_img += 1
             total = sum(os.path.getsize(os.path.join(pet_img_dir, f))
                         for f in os.listdir(pet_img_dir)) if os.path.isdir(pet_img_dir) else 0
-            log(f"宠物图像：{n_img} / {len(pets)} 只取到行走图，合计 {total / 1024:.0f}KB")
+            log(f"宠物头像：{n_img} / {len(pets)} 只取到行走图（缺 {n_missing}）；"
+                f"共用 {len(src_names)} 种原图，合计 {total / 1024:.0f}KB")
         except ImportError:
-            log("宠物图像：没装 Pillow，跳过")
+            log("宠物头像：没装 Pillow，跳过")
 
     # ---------- 7.6 进化链（按阶段合并，同阶段的不同形态是分支） ----------
     # 需求：由同一个初始魔物衍生出的多条链要合并成**一条**完整链；

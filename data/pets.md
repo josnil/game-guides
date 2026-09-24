@@ -84,8 +84,7 @@ permalink: /data/pets/
 
             <span class="gd-pet">
               {%- if wbF.sprite -%}
-                <img src="{{ wbF.sprite | relative_url }}" width="48" height="48" alt=""
-                     style="image-rendering: pixelated">
+                <img src="{{ wbF.sprite | relative_url }}" class="gd-pet__img" alt="">
               {%- endif -%}
               <span>
                 <b>{{ wbF.name }}</b>
@@ -145,8 +144,7 @@ permalink: /data/pets/
           <td>
             <span class="gd-name">
               {%- if wbP.sprite -%}
-                <img src="{{ wbP.sprite | relative_url }}" width="32" height="32" alt=""
-                     style="image-rendering: pixelated">
+                <img src="{{ wbP.sprite | relative_url }}" class="gd-pet__img gd-pet__img--sm" alt="">
               {%- endif -%}
               <span>{{ wbP.name }}</span>
             </span>
@@ -190,7 +188,19 @@ permalink: /data/pets/
     联合进化还需要额外的辅助宠物。魔变技能与魔变装备来自宠物系统配置与宠物备注。
   </p>
   <p>
-    宠物头像从游戏的<strong>行走图</strong>里取（宠物没有图标索引），
-    取朝下站立的那一帧；取不到行走图的宠物就不显示头像。
+    宠物<strong>没有专门的图标字段</strong>，头像只能借别的图。四种候选里只有行走图显示的是
+    <strong>怪物形态</strong>，所以选了它：角色头像（<code>img/faces</code>）和我方战斗图
+    （<code>img/sv_actors</code>）都是人形立绘，敌人立绘（<code>img/sv_enemies</code>）虽然覆盖最全，
+    但约七成都指向同一张「史莱姆」。
+  </p>
+  <p>
+    取的是行走图里<strong>朝下站立</strong>的那一帧。注意这类图的格子尺寸并不统一
+    （本作的 <code>$BigMonster*</code> 是 120px，其它是 48px），要按图本身算，
+    不能按固定格子切。
+  </p>
+  <p>
+    <strong>头像会重复</strong>：游戏本身让多只宠物共用同一张行走图
+    （107 只宠物只用到 4 张），所以史莱姆、毒菇怪、黄金蝎这些会显示同一个形象。
+    这是游戏数据如此，本站照实呈现 —— 取不到行走图的宠物不显示头像，也不放占位图。
   </p>
 </details>
