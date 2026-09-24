@@ -1569,7 +1569,7 @@
   //    改成大写后 Sass 认不出这个函数，原样输出给浏览器，
   //    而 CSS 的函数名大小写不敏感，仍然按 min() 生效。
   //    just-the-docs 主题自己也是这么绕的（它用的是 Max(...)）。
-  max-width: Min(24rem, 78vw);
+  max-width: Min(30rem, 82vw);   // 技能描述可能较长，浮窗给宽一点
   padding: 0.7rem 0.85rem;
   border: 1px solid rgba(212, 160, 74, 0.5);
   border-radius: 10px;

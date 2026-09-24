@@ -511,7 +511,12 @@ def main():
             "iconIndex": s.get("iconIndex", 0),
             "stypeId": s.get("stypeId", 0),
             "stype": tn("skillTypes", s.get("stypeId", 0)),
-            "desc": clean_text(s.get("description")),
+            # ⚠️ 技能的 description 字段**几乎都是空的**，真正的说明写在备注里：
+            #      <Description: 一句话说明>
+            #      <DamageInfo: 具体效果/数值，可多行>
+            #    只读 description 会让所有技能浮窗都没有描述（我踩过）。
+            "desc": clean_text(note_get(note, "Description", "") or s.get("description")),
+            "detail": clean_text(note_get(note, "DamageInfo", "")),
             "mpCost": s.get("mpCost", 0),
             "tpCost": s.get("tpCost", 0),
             "formula": dmg.get("formula") or "",
@@ -613,6 +618,7 @@ def main():
                                 "stype": sk.get("stype", ""),
                                 # 浮窗里要展示技能的说明与伤害公式，这里一并带上
                                 "desc": sk.get("desc", ""),
+                                "detail": sk.get("detail", ""),
                                 "formula": sk.get("formula", ""),
                                 "mpCost": sk.get("mpCost", 0),
                                 "tpCost": sk.get("tpCost", 0)})
@@ -720,31 +726,76 @@ def main():
     log(f"宠物：{len(pets)} 只（其中 {sum(1 for p in pets if p['evolvesTo'])} 只有进化去向）")
 
     # ---------- 7.5 宠物头像 ----------
-    # 宠物没有专门的图标字段，只能借别的图。四种候选实测对比：
-    #     characterName → img/characters  行走图   7 种 / 106 只  ← 选它
-    #     faceName      → img/faces       头像     5 种 / 106 只（全是人形立绘，不像怪）
-    #     battlerName   → img/sv_actors   我方战斗图 6 种 / 106 只（全是人类角色）
-    #     enemyId       → img/sv_enemies  敌人立绘   9 种 / 107 只（覆盖最全，但约七成
-    #                                                  都指向同一张 Slime，一只蓝史莱姆）
-    # 只有行走图显示的是**怪物形态**，所以选它。
+    # **正确的图源在「同名敌人的备注」里**，而不是 Actor 上的图片字段：
+    #     <SV Battler: $BigMonster7>   立绘文件名
+    #     <SV Sheet: 3x4>              网格 3 列 × 4 行
+    #     <SV Row: 3>                  用第几行（1 起）
+    # 同一张图靠「行」区分不同怪：水晶史莱姆 / 史莱姆魔王 / 将军史莱姆 / 元素史莱姆王
+    # 都出自 $BigMonster7，行号分别是 3/4/1/2 ⇒ (图, 行) 去重后 **104 种**，
+    # 也就是每只宠物都有自己的立绘。
     #
-    # ⚠️ 行走图裁帧有两个坑：
-    #   1) **格子尺寸不是固定的 48px**：$BigMonster* 是 360x480（格子 120px），
-    #      其它是 576x384（格子 48px）。要按图本身算：
-    #          $ 开头的图 = 1 个角色，格子 = 宽/3
-    #          其它图      = 4×2 个角色，格子 = 宽/12
-    #      我一开始硬编码 48，结果每张头像都是角色之间的空隙碎片。
-    #   2) 布局是「每个角色 3 列 × 4 行」——列是三帧行走动画、行是朝向
-    #      （0 朝下 / 1 朝左 / 2 朝右 / 3 朝上）。取「朝下 + 站立」= 列偏移 +1、行偏移 +0。
+    # 之前走过的三条弯路（都验证过、都不对）：
+    #   Actor.characterName  行走图   只有 7 种 —— 猪家族 10 只全长一样（同一只眼球怪）
+    #   Actor.faceName       人形立绘
+    #   Actor.battlerName    我方战斗图 = 人类角色
+    #   Enemy.battlerName    只是占位，107 只里约七成都是 Slime
+    # ⇒ 教训：**别按字段名猜图源**。真正的立绘写在敌人备注的尖括号标签里。
     #
-    # 部分宠物共用同一张行走图（游戏数据如此），头像会重复 ——
-    # 页面上如实说明，不放占位图、不伪造。
+    # 回退链（尽量让每只都有图；都没有就不放，不猜也不放占位图）：
+    #   1) 同名敌人 → <SV Battler> 裁帧
+    #   2) 同名敌人 → <Sideview Battler>（VisuMZ 写法）→ img/sv_actors 裁帧
+    #   3) 名字包含宠物名的敌人 → <SV Battler>
+    #   4) 同名敌人的 battlerName → img/sv_enemies 整张图
     key_hex = system.get("encryptionKey")
     char_dir = os.path.join(game, "img", "characters")
+    sv_actor_dir = os.path.join(game, "img", "sv_actors")
+    sv_enemy_dir = os.path.join(game, "img", "sv_enemies")
     pet_img_dir = os.path.join(REPO, "assets", "gamedata", "pets")
+
+    def en_norm(s):
+        """敌人名里带【】和空格，比较前先归一化"""
+        return re.sub(r"[【】\s]", "", s or "")
+
+    en_by_name = {}
+    for en in enemies_raw:
+        if en:
+            en_by_name.setdefault(en_norm(en.get("name")), []).append(en)
+
+    def find_enemy(pet_name):
+        """按「同名 → 名字包含」的顺序找敌人"""
+        stem = en_norm(pet_name)
+        exact = en_by_name.get(stem)
+        if exact:
+            return exact[0]
+        for key, lst in en_by_name.items():
+            if stem and stem in key:
+                return lst[0]
+        return None
+
+    def frame_from_sheet(png, grid, row):
+        """按 <SV Sheet: 3x4> / <SV Row: n> 裁一帧（取第 1 列 = 站立帧）"""
+        from PIL import Image
+        import io
+        im = Image.open(io.BytesIO(png)).convert("RGBA")
+        try:
+            gc, gr = [int(x) for x in str(grid or "3x4").lower().split("x")]
+        except ValueError:
+            gc, gr = 3, 4
+        if gc < 1 or gr < 1 or im.size[0] // gc < 8 or im.size[1] // gr < 8:
+            return im
+        cw, ch = im.size[0] // gc, im.size[1] // gr
+        # <SV Row> 可能是多值（例如「1,19,28,47,62」），只取第一个
+        parts = [x for x in re.split(r"[,\s]+", str(row or "1").strip()) if x]
+        try:
+            ri = max(0, min(gr - 1, int(parts[0]) - 1)) if parts else 0
+        except ValueError:
+            ri = 0
+        return im.crop((1 * cw, ri * ch, 2 * cw, (ri + 1) * ch))
+
     n_img = 0
     n_missing = 0
     src_names = set()
+    fallback_used = {}
     if key_hex and os.path.isdir(char_dir) and not args.no_icons:
         try:
             from PIL import Image
@@ -754,45 +805,83 @@ def main():
                 if f.endswith(".png"):
                     os.remove(os.path.join(pet_img_dir, f))
             for p in pets:
-                a = actors.get(p["id"]) or {}
-                cn = a.get("characterName")
-                ci = a.get("characterIndex") or 0
-                if not cn:
+                en = find_enemy(p["name"])
+                note = (en or {}).get("note") or ""
+                frame = None
+                used = None
+                # 1) 同名敌人的 <SV Battler>
+                sb = note_get(note, "SV Battler", "")
+                if sb:
+                    src = os.path.join(char_dir, sb + ".png_")
+                    if os.path.exists(src):
+                        png = decrypt_rpgmv(src, key_hex)
+                        if png and png[:8] == b"\x89PNG\r\n\x1a\n":
+                            frame = frame_from_sheet(png, note_get(note, "SV Sheet", "3x4"),
+                                                     note_get(note, "SV Row", "1"))
+                            used = "sv-battler"
+                            src_names.add(sb)
+                # 2) VisuMZ 的 <Sideview Battler>（图在 sv_actors，9 列 × 6 行）
+                if frame is None:
+                    sv = note_get(note, "Sideview Battler", "")
+                    if sv:
+                        src = os.path.join(sv_actor_dir, sv + ".png_")
+                        if os.path.exists(src):
+                            png = decrypt_rpgmv(src, key_hex)
+                            if png and png[:8] == b"\x89PNG\r\n\x1a\n":
+                                frame = frame_from_sheet(png, "9x6", 2)
+                                used = "sideview-battler"
+                                src_names.add(sv)
+                # 3) 换一个「名字包含本宠物」且带 <SV Battler> 的敌人
+                if frame is None:
+                    stem = en_norm(p["name"])
+                    for key, lst in en_by_name.items():
+                        if not stem or stem not in key:
+                            continue
+                        for alt in lst:
+                            alt_note = alt.get("note") or ""
+                            alt_sb = note_get(alt_note, "SV Battler", "")
+                            if not alt_sb:
+                                continue
+                            src = os.path.join(char_dir, alt_sb + ".png_")
+                            if os.path.exists(src):
+                                png = decrypt_rpgmv(src, key_hex)
+                                if png and png[:8] == b"\x89PNG\r\n\x1a\n":
+                                    frame = frame_from_sheet(
+                                        png, note_get(alt_note, "SV Sheet", "3x4"),
+                                        note_get(alt_note, "SV Row", "1"))
+                                    used = "sv-battler-alt"
+                                    src_names.add(alt_sb)
+                                    break
+                        if frame is not None:
+                            break
+                # 4) 兜底：敌人的 battlerName → sv_enemies 整张图
+                if frame is None:
+                    bn = (en or {}).get("battlerName")
+                    if bn:
+                        src = os.path.join(sv_enemy_dir, bn + ".png_")
+                        if os.path.exists(src):
+                            png = decrypt_rpgmv(src, key_hex)
+                            if png and png[:8] == b"\x89PNG\r\n\x1a\n":
+                                frame = Image.open(io.BytesIO(png)).convert("RGBA")
+                                used = "sv-enemy-fallback"
+                                src_names.add(bn)
+                if frame is None:
                     n_missing += 1
                     continue
-                src = os.path.join(char_dir, cn + ".png_")
-                if not os.path.exists(src):
-                    n_missing += 1
-                    continue
-                png = decrypt_rpgmv(src, key_hex)
-                if not png or png[:8] != b"\x89PNG\r\n\x1a\n":
-                    n_missing += 1
-                    continue
-                im = Image.open(io.BytesIO(png)).convert("RGBA")
-                W, H = im.size
-                if cn.startswith("$"):
-                    gx, gy, cell = 0, 0, W // 3
-                else:
-                    gx, gy, cell = ci % 4, ci // 4, W // 12
-                if cell < 8:
-                    n_missing += 1
-                    continue
-                box = ((gx * 3 + 1) * cell, (gy * 4 + 0) * cell,
-                       (gx * 3 + 2) * cell, (gy * 4 + 1) * cell)
-                frame = im.crop(box)
                 out = os.path.join(pet_img_dir, "%d.png" % p["id"])
-                # ⚠️ 量化前**不能** convert("RGB")：会丢掉 alpha，
+                # ⚠️ 量化前**不能** convert("RGB")：会丢 alpha，
                 #    透明背景变成不透明近白色，图标在浅色背景上"隐形"且不报错。
-                #    FASTOCTREE 支持带 alpha 的调色板量化，体积也更小。
                 frame.quantize(colors=256, method=Image.FASTOCTREE).save(
                     out, "PNG", optimize=True)
                 p["sprite"] = "/assets/gamedata/pets/%d.png" % p["id"]
-                src_names.add(cn)
+                p["artSource"] = used
+                fallback_used[used] = fallback_used.get(used, 0) + 1
                 n_img += 1
             total = sum(os.path.getsize(os.path.join(pet_img_dir, f))
                         for f in os.listdir(pet_img_dir)) if os.path.isdir(pet_img_dir) else 0
-            log(f"宠物头像：{n_img} / {len(pets)} 只取到行走图（缺 {n_missing}）；"
-                f"共用 {len(src_names)} 种原图，合计 {total / 1024:.0f}KB")
+            log(f"宠物头像：{n_img} / {len(pets)} 只取到立绘（缺 {n_missing}）；"
+                f"来源分布 {fallback_used}，共用 {len(src_names)} 张原图，"
+                f"合计 {total / 1024:.0f}KB")
         except ImportError:
             log("宠物头像：没装 Pillow，跳过")
 

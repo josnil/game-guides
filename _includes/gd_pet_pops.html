@@ -35,7 +35,10 @@
               {{ wbPpEx.stype | default: '专属技能' }}{% if wbPpEx.mpCost > 0 %} · MP {{ wbPpEx.mpCost }}{% endif %}{% if wbPpEx.tpCost > 0 %} · TP {{ wbPpEx.tpCost }}{% endif %}
             </span>
             {%- if wbPpEx.desc != "" -%}<span class="gd-pop__desc">{{ wbPpEx.desc }}</span>{%- endif -%}
-            {%- if wbPpEx.formula != "" -%}<span class="gd-pop__meta">伤害公式：{{ wbPpEx.formula }}</span>{%- endif -%}
+            {%- if wbPpEx.detail != "" -%}<span class="gd-pop__desc">{{ wbPpEx.detail }}</span>{%- endif -%}
+            {%- if wbPpEx.formula != "" and wbPpEx.formula != "0" -%}
+              <span class="gd-pop__meta">伤害公式：{{ wbPpEx.formula }}</span>
+            {%- endif -%}
           </span>
         </span>
       </span>
@@ -58,7 +61,10 @@
                 {{ wbPpSk.stype }}{% if wbPpSk.probability < 100 %} · 触发率 {{ wbPpSk.probability }}%{% endif %}{% if wbPpSk.mpCost > 0 %} · MP {{ wbPpSk.mpCost }}{% endif %}
               </span>
               {%- if wbPpSk.desc != "" -%}<span class="gd-pop__desc">{{ wbPpSk.desc }}</span>{%- endif -%}
-              {%- if wbPpSk.formula != "" -%}<span class="gd-pop__meta">伤害公式：{{ wbPpSk.formula }}</span>{%- endif -%}
+              {%- if wbPpSk.detail != "" -%}<span class="gd-pop__desc">{{ wbPpSk.detail }}</span>{%- endif -%}
+              {%- if wbPpSk.formula != "" and wbPpSk.formula != "0" -%}
+                <span class="gd-pop__meta">伤害公式：{{ wbPpSk.formula }}</span>
+              {%- endif -%}
             </span>
           </span>
         {%- endfor -%}
