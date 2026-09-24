@@ -12,7 +12,16 @@ permalink: /map/
 
 下表与地图上的标记一一对应。窄屏下地图标记不好点，用这里的链接更稳妥。
 
-<table>
+<div data-gd-table>
+  <div class="gd-toolbar">
+    <label class="sr-only" for="f-地点">按地点筛选</label>
+    <input type="search" id="f-地点" data-gd-filter placeholder="输入地点名筛选，例如「沼泽」">
+    <span class="gd-count" data-gd-count aria-live="polite"></span>
+  </div>
+  <p class="gd-empty" data-gd-empty hidden>没有匹配的条目。换个关键词试试。</p>
+
+  <div class="gd-table-wrap">
+<table class="gd-table">
   <thead>
     <tr>
       <th scope="col">地点</th>
@@ -36,6 +45,9 @@ permalink: /map/
   {%- endfor -%}
   </tbody>
 </table>
+  </div>
+</div>
+
 
 {%- comment -%}
   下面这段是给维护者看的：数据怎么来的、怎么更新。

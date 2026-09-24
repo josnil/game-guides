@@ -14,6 +14,15 @@ permalink: /data/
 
 本站数据全部从游戏本体提取，不是手工录入的。
 
+<div data-gd-table>
+  <div class="gd-toolbar">
+    <label class="sr-only" for="f-数据分类">按分类或说明筛选</label>
+    <input type="search" id="f-数据分类" data-gd-filter placeholder="输入分类名筛选，例如「技能」">
+    <span class="gd-count" data-gd-count aria-live="polite"></span>
+  </div>
+  <p class="gd-empty" data-gd-empty hidden>没有匹配的条目。换个关键词试试。</p>
+
+  <div class="gd-table-wrap">
 <table class="gd-table">
   <thead>
     <tr><th scope="col">分类</th><th scope="col" class="gd-num">条目数</th><th scope="col">说明</th></tr>
@@ -56,6 +65,9 @@ permalink: /data/
     </tr>
   </tbody>
 </table>
+  </div>
+</div>
+
 
 ## 装备属性为什么是一个区间
 
