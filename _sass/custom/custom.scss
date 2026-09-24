@@ -1069,17 +1069,28 @@
 }
 
 // ---------- 9.2 数据表 ----------
-// ⚠️ 表格容器**不能**默认写 overflow-x: auto。
-//    auto 会把子元素裁进这个盒子，而技能浮窗正好在盒子之外 —— 会被静默裁掉。
-//    （这是同一个坑第三次出现：世界地图的名牌、地点图的浮窗、现在是技能浮窗。）
-//    表格本身是 width:100%，正常屏幕放得下；只有窄屏才需要横向滚动。
+// 宽表必须能横向滚动，否则靠后的列会被裁掉（玩家就看不到了）。
+// 之前的做法是「只在窄屏开 overflow-x」，理由是 overflow 会把技能浮窗裁掉 ——
+// 那是**用错的方法解决冲突**：正确做法是让浮窗脱离文档流（position: fixed），
+// 这样滚动容器怎么裁都影响不到它。见 11.1。
 .gd-table-wrap {
+  overflow-x: auto;
   margin-bottom: 2rem;
-}
+  // 滚动条做细一点，但保持可见 —— 让「右边还有内容」这件事看得出来
+  scrollbar-width: thin;
+  scrollbar-color: var(--wb-gold-500) transparent;
 
-@media (max-width: 40rem) {
-  .gd-table-wrap {
-    overflow-x: auto;
+  &::-webkit-scrollbar {
+    height: 10px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background-color: rgba(212, 160, 74, 0.55);
+  }
+
+  &::-webkit-scrollbar-track {
+    background-color: rgba(11, 18, 25, 0.06);
   }
 }
 
@@ -1170,6 +1181,13 @@
 // 数据表：紧凑、可横向滚动，数字列右对齐
 .gd-table {
   width: 100%;
+  // 六列的最低可读宽度。容器比它窄（窄屏、放大、列特别多）时，
+  // 由 .gd-table-wrap 提供横向滚动，而不是把某一列压成十几像素、
+  // 连表头文字都被裁掉（这是玩家反馈「看不到靠后的列」的直接原因）。
+  //
+  // 用固定值而不是 max-content：后者会按「完全不换行」来算宽度，
+  // 技能表那种长描述会被撑到几千像素。
+  min-width: 44rem;
   border-collapse: collapse;
   font-size: 0.86rem;
 
@@ -1558,18 +1576,27 @@
 }
 
 .gd-pop__panel {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
-  z-index: 30;
+  // ⚠️ 用 position: fixed 而不是 absolute。
+  //    浮窗在表格里，而表格容器有 overflow-x: auto（宽表必须能横向滚动）——
+  //    absolute 的浮窗会被那个滚动容器裁掉。fixed 让它脱离所有会裁剪的祖先，
+  //    坐标由 assets/js/gd-pop.js 按触发按钮的位置算。
+  //    这样「能滚动」和「浮窗完整」就不再冲突了。
+  position: fixed;
+  // 先放到屏幕外，等 JS 定位好再显示，避免闪一下
+  top: -9999px;
+  left: -9999px;
+  z-index: 60;
   width: max-content;
   min-width: 15rem;
-  // ⚠️ 必须写大写的 Min(...)：Sass 有自己的 min()/max() 函数，
-  //    小写会被它当成待求值的表达式（rem 与 vw 不兼容 → 直接编译报错、整站构建失败）。
-  //    改成大写后 Sass 认不出这个函数，原样输出给浏览器，
-  //    而 CSS 的函数名大小写不敏感，仍然按 min() 生效。
-  //    just-the-docs 主题自己也是这么绕的（它用的是 Max(...)）。
-  max-width: Min(30rem, 82vw);   // 技能描述可能较长，浮窗给宽一点
+  // 必须写大写的 Min(...)：Sass 有自己的 min()/max() 函数，
+  // 小写会被它当成待求值的表达式（rem 与 vw 不兼容 → 直接编译报错、整站构建失败）。
+  // 改成大写后 Sass 认不出这个函数，原样输出给浏览器，
+  // 而 CSS 的函数名大小写不敏感，仍然按 min() 生效。
+  // just-the-docs 主题自己也是这么绕的（它用的是 Max(...)）。
+  max-width: Min(30rem, 82vw);
+  // 技能多的宠物浮窗可能很长，限高并允许内部滚动（同样用大写 Min）
+  max-height: Min(70vh, 32rem);
+  overflow-y: auto;
   padding: 0.7rem 0.85rem;
   border: 1px solid rgba(212, 160, 74, 0.5);
   border-radius: 10px;
@@ -1578,17 +1605,11 @@
   box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.65);
   opacity: 0;
   visibility: hidden;
-  transform: translateY(4px);
   // 面板只读，不接收鼠标事件 —— 否则鼠标移上去时会和触发按钮之间来回闪
   pointer-events: none;
   transition:
     opacity 0.16s ease,
-    transform 0.2s var(--wb-ease),
     visibility 0.16s;
-
-  // ⚠️ 面板向上弹出，所以它的父级链路上都不能有 overflow 裁剪。
-  //    历史上被这条坑过三次（世界地图名牌、地点图浮窗、这里的技能浮窗）。
-  //    表格容器 .gd-table-wrap 因此只在窄屏才开 overflow-x。
 }
 
 .gd-pop:hover .gd-pop__panel,
@@ -1596,7 +1617,6 @@
 .gd-pop.is-open .gd-pop__panel {
   opacity: 1;
   visibility: visible;
-  transform: translateY(0);
 }
 
 .gd-pop__row {
