@@ -717,6 +717,61 @@ if (includeIssues === 0) {
 }
 
 // ============================================================
+// 标题与 HTML 被并成一段（Kramdown 的空白敏感性）
+// ------------------------------------------------------------
+// Liquid 的 `{%- ... %}` 会吃掉标签**前面的空白，包括换行**。
+// 于是这种写法：
+//     ## 进化链
+//     <空行>
+//     {%- for x in y %}
+//     <section class="gd-chain">
+// 在 Liquid 处理后会变成「标题行紧贴着 <section>」——
+// Kramdown 把两者当成同一段，标题内容变成「进化链<section class=…>」，
+// 后面的缩进 HTML 还会整段被当代码块转义，页面上直接显示原始标签。
+// 本地静态检查能识别这个模式：标题 → 空行 → 左裁剪标签 → HTML。
+// ============================================================
+const pageFiles = walk(ROOT).filter(
+  (p) =>
+    p.endsWith(".md") &&
+    !p.includes(`${path.sep}node_modules${path.sep}`) &&
+    !p.startsWith(GUIDES_DIR + path.sep) &&
+    rel(p) !== "README.md"
+);
+let mergeHits = 0;
+for (const f of pageFiles) {
+  // 先把 {% comment %} 块整段删掉：注释不产生输出，但会干扰逐行分析。
+  // （不删的话，注释里的文字行会把「往后找第一行实际输出」的逻辑卡住，
+  //   检查就永远报通过 —— 形同虚设。）
+  const src = fs
+    .readFileSync(f, "utf8")
+    .replace(/{%-?\s*comment\s*-?%}[\s\S]*?{%-?\s*endcomment\s*-?%}/g, "");
+  const lines = src.split(/\r?\n/);
+  for (let i = 0; i < lines.length - 3; i++) {
+    if (!/^#{1,6}\s+\S/.test(lines[i])) continue;      // 标题行
+    if (lines[i + 1].trim() !== "") continue;           // 需要紧跟一个空行
+    // 跳过所有空行，找第一个非空行（剥离注释后可能留下多个连续空行）
+    let j = i + 1;
+    while (j < lines.length && lines[j].trim() === "") j++;
+    if (j >= lines.length || !/^\s*{%-/.test(lines[j])) continue;
+    // 再跳过不产出内容的标签，落到第一行实际输出
+    while (
+      j < lines.length &&
+      (/^\s*{%-?\s*(assign|if|endif|for|endfor|unless|endunless|raw|endraw)\b/.test(lines[j]) ||
+        lines[j].trim() === "")
+    ) {
+      j++;
+    }
+    if (j < lines.length && /^\s*</.test(lines[j])) {
+      E(rel(f), `第 ${i + 1} 行：标题「${lines[i].trim()}」后的空行会被后面的 { %- 标签` +
+        `吃掉，与下面的 HTML 并成一段（页面会把标签原样显示成文字）。` +
+        `请用 <div markdown="0"> 把这段 HTML 包起来。`);
+      mergeHits++;
+    }
+  }
+}
+if (mergeHits === 0) console.log("  · 标题与 HTML：没有会被并段的写法");
+
+// ============================================================
 // 7. 其他
 // ============================================================
 if (fs.existsSync(path.join(ROOT, "CNAME"))) {

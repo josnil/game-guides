@@ -27,6 +27,15 @@ permalink: /data/pets/
 
 ## 进化链
 
+{%- comment -%}
+  ⚠️ 这里必须用 <div markdown="0"> 把整段包起来，让 Kramdown 跳过 Markdown 处理。
+  原因：Liquid 的 `{%- ... %}` 会**吃掉标签前面的空白（包括换行）**，
+  于是 `## 进化链` 与紧随其后的 `<section>` 之间那个空行消失了 ——
+  两者被并成同一段，标题变成「进化链&lt;section class="gd-chain"&gt;」，
+  后面的缩进 HTML 还会被当成代码块整段转义，页面上直接显示原始标签。
+  markdown="0" 让 Kramdown 原样透传这段内容，从根上避免这类空白敏感性。
+{%- endcomment -%}
+<div markdown="0">
 {%- for wbG in wbGroups %}
 {%- assign wbHasBranch = false -%}
 {%- for wbSt in wbG.stages -%}
@@ -93,6 +102,7 @@ permalink: /data/pets/
   {%- endfor %}
 </section>
 {%- endfor %}
+</div>
 
 ---
 
