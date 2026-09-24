@@ -739,32 +739,33 @@ const pageFiles = walk(ROOT).filter(
 );
 let mergeHits = 0;
 for (const f of pageFiles) {
-  // 先把 {% comment %} 块整段删掉：注释不产生输出，但会干扰逐行分析。
-  // （不删的话，注释里的文字行会把「往后找第一行实际输出」的逻辑卡住，
-  //   检查就永远报通过 —— 形同虚设。）
-  const src = fs
-    .readFileSync(f, "utf8")
-    .replace(/{%-?\s*comment\s*-?%}[\s\S]*?{%-?\s*endcomment\s*-?%}/g, "");
+  // 预处理：把注释块替换成占位标记，并**保留「它的开标签是不是左裁剪标签」这一信息**。
+  // （上一版直接把注释删掉，结果注释自己吃掉空行的情况被漏判了 ——
+  //   而注释块的开标签恰恰也是最常见的罪魁：{%- comment -%}。）
+  const src = fs.readFileSync(f, "utf8").replace(
+    /{%(-?)\s*comment\s*-?%}[\s\S]*?{%-?\s*endcomment\s*-?%}/g,
+    (_m, dash) => (dash === "-" ? "@@EATER@@" : "@@COMMENT@@")
+  );
   const lines = src.split(/\r?\n/);
-  for (let i = 0; i < lines.length - 3; i++) {
+  for (let i = 0; i < lines.length - 2; i++) {
     if (!/^#{1,6}\s+\S/.test(lines[i])) continue;      // 标题行
     if (lines[i + 1].trim() !== "") continue;           // 需要紧跟一个空行
-    // 跳过所有空行，找第一个非空行（剥离注释后可能留下多个连续空行）
     let j = i + 1;
-    while (j < lines.length && lines[j].trim() === "") j++;
-    if (j >= lines.length || !/^\s*{%-/.test(lines[j])) continue;
-    // 再跳过不产出内容的标签，落到第一行实际输出
-    while (
-      j < lines.length &&
-      (/^\s*{%-?\s*(assign|if|endif|for|endfor|unless|endunless|raw|endraw)\b/.test(lines[j]) ||
-        lines[j].trim() === "")
-    ) {
-      j++;
+    let eater = false;
+    while (j < lines.length) {
+      const L = lines[j];
+      if (L.trim() === "") { j++; continue; }
+      if (L.includes("@@EATER@@")) { eater = true; j++; continue; }  // 左裁剪的注释块
+      if (L.includes("@@COMMENT@@")) { j++; continue; }              // 普通注释块
+      if (/^\s*{%-/.test(L)) { eater = true; j++; continue; }        // 左裁剪标签
+      if (/^\s*{%/.test(L)) { j++; continue; }                       // 普通标签：换行会保留
+      break;
     }
-    if (j < lines.length && /^\s*</.test(lines[j])) {
-      E(rel(f), `第 ${i + 1} 行：标题「${lines[i].trim()}」后的空行会被后面的 { %- 标签` +
-        `吃掉，与下面的 HTML 并成一段（页面会把标签原样显示成文字）。` +
-        `请用 <div markdown="0"> 把这段 HTML 包起来。`);
+    if (eater && j < lines.length && /^\s*</.test(lines[j])) {
+      E(rel(f), `第 ${i + 1} 行：标题「${lines[i].trim()}」与第 ${j + 1} 行的 HTML 之间夹着` +
+        `左裁剪标签（{%- …），它会吃掉标题后的空行，两者被并成一段 ——` +
+        `标题里混进 HTML，后面的缩进内容会被整段当成代码块转义。` +
+        `改法：把注释挪到标题之前，并用 <div markdown="0"> 包住这段 HTML。`);
       mergeHits++;
     }
   }
