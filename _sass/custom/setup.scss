@@ -76,4 +76,9 @@ $header-height: 4rem;
 $nav-width: 11rem;
 $nav-width-md: 10rem;
 
-// $content-width: 50rem;
+// 正文列宽。主题默认 50rem（800px），对攻略正文够用，
+// 但数据页的表格有 6 列、每列还带标签，800px 装不下 ——
+// 结果最后一列被挤出可视区，玩家得横向滚动才看得到（实际的反馈来源）。
+// 放宽到 58rem（928px）后常见屏宽下表格能完整放下；
+// 正文行长也还在舒服范围内。
+$content-width: 58rem;

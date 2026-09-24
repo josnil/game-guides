@@ -1260,7 +1260,7 @@
   //
   // 用固定值而不是 max-content：后者会按「完全不换行」来算宽度，
   // 技能表那种长描述会被撑到几千像素。
-  min-width: 44rem;
+  min-width: 40rem;
   border-collapse: collapse;
   font-size: 0.86rem;
 
@@ -1303,7 +1303,9 @@
   .gd-range {
     color: var(--wb-text-muted);
     font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+    // 允许标签之间换行（单个标签内部仍不折行）——
+    // 这样「掉落来源」列出多个怪时不会把整列撑得很宽
+    white-space: normal;
   }
 
   .gd-tag {
