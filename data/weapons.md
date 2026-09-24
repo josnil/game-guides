@@ -23,7 +23,9 @@ permalink: /data/weapons/
   </div>
   <p class="gd-empty" data-gd-empty hidden>没有匹配的武器。换个关键词试试。</p>
 
-  <div class="gd-table-wrap">
+  {% include gd_table_hint.html %}
+
+<div class="gd-table-wrap">
     <table class="gd-table">
       <thead>
         <tr>

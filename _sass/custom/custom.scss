@@ -1073,14 +1073,21 @@
 // 之前的做法是「只在窄屏开 overflow-x」，理由是 overflow 会把技能浮窗裁掉 ——
 // 那是**用错的方法解决冲突**：正确做法是让浮窗脱离文档流（position: fixed），
 // 这样滚动容器怎么裁都影响不到它。见 11.1。
+//
+// ⚠️ 还必须有 max-height：武器表有 262 行、技能表 1067 行，
+//    不限高的话横向滚动条会落在表格**最底部**，玩家得先滚过上千行才够得着 ——
+//    体感就是「没有滚动条」。限高后两种滚动条都在可视区内，
+//    表头的 position: sticky 也才真正起作用（吸在这个滚动区顶部）。
 .gd-table-wrap {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 80vh;
   margin-bottom: 2rem;
-  // 滚动条做细一点，但保持可见 —— 让「右边还有内容」这件事看得出来
+  // 滚动条做细一点，但保持可见 —— 让「右边/下面还有内容」这件事看得出来
   scrollbar-width: thin;
   scrollbar-color: var(--wb-gold-500) transparent;
 
   &::-webkit-scrollbar {
+    width: 10px;
     height: 10px;
   }
 
@@ -1092,6 +1099,12 @@
   &::-webkit-scrollbar-track {
     background-color: rgba(11, 18, 25, 0.06);
   }
+}
+
+.gd-hint {
+  margin: 0 0 0.6rem;
+  color: var(--wb-text-muted);
+  font-size: 0.78rem;
 }
 
 // 分类之间的快捷导航
