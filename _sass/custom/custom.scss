@@ -1082,6 +1082,22 @@
   overflow: auto;
   max-height: 80vh;
   margin-bottom: 2rem;
+
+  // ⚠️⚠️ 主题（just-the-docs）会给每个表格再套一层 div.table-wrapper，
+  //      而那层自带 overflow: auto。如果不管它，就会变成「内层滚动、外层看戏」：
+  //        .gd-table-wrap     → 看不到溢出（子元素宽度正好等于自己）
+  //          .table-wrapper   → 真正在横向滚动的那层
+  //            table          → 实际超出
+  //      后果：横向滚动条落在内层**两万多像素高的内容底部**，
+  //      玩家必须先滚过整张表才够得着 —— 体感就是「只有竖向滚动条」。
+  //      （我一开始只量了外层 scrollWidth，得出「没有溢出、一切正常」，
+  //        那是量错了层级。）
+  //      这里把内层的滚动放开，统一交给 .gd-table-wrap，
+  //      两种滚动条就都待在同一个可视区里了。
+  .table-wrapper {
+    overflow: visible;
+  }
+
   // 滚动条做细一点，但保持可见 —— 让「右边/下面还有内容」这件事看得出来
   scrollbar-width: thin;
   scrollbar-color: var(--wb-gold-500) transparent;
