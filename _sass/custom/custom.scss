@@ -1123,6 +1123,69 @@
   font-size: 0.78rem;
 }
 
+// ---------- 9.2.0 分类筛选（chips）----------
+// 名称搜索之外，再给「持握 / 类型」这类有限集合的分面筛选。
+// 按钮而不是 select：选项少、一眼看全、点一下就切换，也更好点按。
+.gd-facets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.gd-facets__label {
+  margin-right: 0.15rem;
+  color: var(--wb-text-muted);
+  font-size: 0.78rem;
+}
+
+.gd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.28rem 0.62rem;
+  border: 1px solid var(--wb-paper-300);
+  border-radius: 999px;
+  background-color: rgba(255, 253, 248, 0.7);
+  color: var(--wb-text);
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    color 0.16s ease,
+    background-color 0.16s ease,
+    border-color 0.16s ease;
+
+  &:hover {
+    border-color: var(--wb-gold-500);
+    background-color: rgba(212, 160, 74, 0.12);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--wb-gold-400);
+    outline-offset: 2px;
+  }
+
+  // 选中态要能一眼看出来：反白
+  &.is-on {
+    border-color: var(--wb-ink-800);
+    background-color: var(--wb-ink-800);
+    color: var(--wb-on-ink);
+  }
+}
+
+.gd-chip__n {
+  color: var(--wb-text-muted);
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+}
+
+.gd-chip.is-on .gd-chip__n {
+  color: rgba(255, 255, 255, 0.72);
+}
+
 // ---------- 9.2.1 可排序表头 ----------
 // 表头文字包在按钮里（键盘可达）。th 的内边距挪到按钮上，
 // 这样整格都可点，不用瞄准文字。

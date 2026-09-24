@@ -436,6 +436,17 @@ def main():
             "classOnly": note_get(note, "Equip For Classes Only"),
             "traits": item.get("traits") or [],
         }
+        # 武器的持握方式（三分，互斥）：
+        #   双刀流  特性 code=55(TRAIT_SLOT_TYPE) value=1
+        #   双手    备注 <双手持>
+        #   单手    其余
+        # 实测三者不重叠：42 件双刀流全无 <双手持>，70 件双手全无 code55。
+        # ⚠️ 二刀流是**特性**不是备注 —— 只在备注里搜「二刀流」只能捞到 1 件测试武器。
+        if kind == "weapon":
+            dual = any(t.get("code") == 55 and t.get("value") == 1
+                       for t in (item.get("traits") or []))
+            out["dualWield"] = dual
+            out["handType"] = "双刀流" if dual else ("双手" if out["twoHanded"] else "单手")
         if kind == "weapon":
             out["wtypeId"] = item.get("wtypeId", 0)
             out["wtype"] = tn("weaponTypes", item.get("wtypeId", 0))

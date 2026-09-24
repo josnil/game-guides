@@ -145,10 +145,33 @@
     var table = root.querySelector("table");
     var countEl = root.querySelector("[data-gd-count]");
     var emptyEl = root.querySelector("[data-gd-empty]");
-    if (!input || !table) return;
+    if (!table) return;
 
     var rows = Array.prototype.slice.call(table.querySelectorAll("tbody tr"));
     var total = rows.length;
+
+    // 分面筛选（chips）：容器写 data-gd-facets="hand"，
+    // 行上写 data-hand="单手"，各自独立、与文字搜索叠加（AND）
+    var facets = Array.prototype.slice
+      .call(root.querySelectorAll("[data-gd-facets]"))
+      .map(function (box) {
+        var key = box.getAttribute("data-gd-facets");
+        var chips = Array.prototype.slice.call(box.querySelectorAll("[data-facet-value]"));
+        var state = { key: key, value: "", chips: chips };
+        chips.forEach(function (chip) {
+          chip.setAttribute("aria-pressed", chip.getAttribute("data-facet-value") === "" ? "true" : "false");
+          chip.addEventListener("click", function () {
+            state.value = chip.getAttribute("data-facet-value") || "";
+            chips.forEach(function (c) {
+              var on = c === chip;
+              c.classList.toggle("is-on", on);
+              c.setAttribute("aria-pressed", on ? "true" : "false");
+            });
+            apply();
+          });
+        });
+        return state;
+      });
 
     // 优先用 data-name（模板里精心拼好的：名称 + 掉落来源 + 类型…），
     // 没有就退回整行文字 —— 这样临时加的小表也能直接筛。
@@ -158,19 +181,39 @@
     }
 
     function apply() {
-      var q = input.value.trim().toLowerCase();
+      var q = (input ? input.value : "").trim().toLowerCase();
       var shown = 0;
       rows.forEach(function (tr) {
         var hit = !q || haystack(tr).indexOf(q) !== -1;
+        if (hit) {
+          for (var i = 0; i < facets.length; i++) {
+            var f = facets[i];
+            if (f.value && (tr.getAttribute("data-" + f.key) || "") !== f.value) {
+              hit = false;
+              break;
+            }
+          }
+        }
         tr.hidden = !hit;
         if (hit) shown++;
       });
-      if (countEl) countEl.textContent = q ? "命中 " + shown + " / " + total : "共 " + total + " 条";
+      if (countEl) {
+        var cond = [];
+        if (q) cond.push("「" + q + "」");
+        facets.forEach(function (f) {
+          if (f.value) cond.push(f.value);
+        });
+        countEl.textContent = cond.length
+          ? "命中 " + shown + " / " + total
+          : "共 " + total + " 条";
+      }
       if (emptyEl) emptyEl.hidden = shown !== 0;
     }
 
-    input.addEventListener("input", apply);
-    input.addEventListener("search", apply);
+    if (input) {
+      input.addEventListener("input", apply);
+      input.addEventListener("search", apply);
+    }
     apply();
   }
 
